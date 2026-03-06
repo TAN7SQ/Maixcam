@@ -1,6 +1,7 @@
 #include "_easyLog.hpp"
 
 std::chrono::steady_clock::time_point Log::start_time;
+Log::LogLevel Log::current_level = Log::LOG_LEVEL_INFO;
 
 void Log::init()
 {
@@ -16,7 +17,9 @@ uint32_t Log::get_elapsed_ms()
 
 void Log::log_print(LogLevel level, const char *TAG, const char *format, va_list args)
 {
-    // 1. 定义级别缩写和对应颜色
+    if (level > current_level) {
+        return;
+    }
     const char *level_char = "";
     const char *color = ANSI_RESET;
     switch (level) {
@@ -46,25 +49,22 @@ void Log::log_print(LogLevel level, const char *TAG, const char *format, va_list
         break;
     }
 
-    // 2. 构造完整日志格式串：颜色 + 级别 (时间) TAG: 内容 + 重置
     char full_format[512] = {0};
     uint32_t elapsed_ms = get_elapsed_ms();
     snprintf(full_format,
              sizeof(full_format),
-             "%s%s (%u) %s: %s%s", // 格式：颜色 + 级别 (时间) TAG: 内容 + 重置
-             color,                // 日志颜色
-             level_char,           // 级别缩写(I/W/E)
-             elapsed_ms,           // 启动后毫秒数
-             TAG,                  // 模块名
-             format,               // 日志内容
-             ANSI_RESET);          // 重置颜色
+             "%s%s (%u) %s: %s%s", //
+             color,
+             level_char,
+             elapsed_ms,
+             TAG,
+             format,
+             ANSI_RESET);
 
-    // 3. 打印带可变参数的日志
     vprintf(full_format, args);
-    printf("\n"); // 换行
+    printf("\n");
 }
 
-// 各级别日志接口实现
 void Log::info(const char *TAG, const char *format, ...)
 {
     va_list args;

@@ -24,16 +24,36 @@ typedef enum
 class Log
 {
 public:
+    enum LogLevel
+    {
+        LOG_LEVEL_ERROR = 0,
+        LOG_LEVEL_WARN,
+        LOG_LEVEL_INFO,
+        LOG_LEVEL_DEBUG,
+        LOG_LEVEL_TRACE
+    };
     static void init();
 
-    static void info(const char *TAG, const char *format, ...);  // Info
-    static void warn(const char *TAG, const char *format, ...);  // Warn
+    void setLogLevel(LogLevel level)
+    {
+        current_level = level;
+    }
+
+    LogLevel getLogLevel()
+    {
+        return current_level;
+    }
+
     static void error(const char *TAG, const char *format, ...); // Error
+    static void warn(const char *TAG, const char *format, ...);  // Warn
+    static void info(const char *TAG, const char *format, ...);  // Info
     static void debug(const char *TAG, const char *format, ...); // Debug
     static void trace(const char *TAG, const char *format, ...); // Trace
 
 private:
     static std::chrono::steady_clock::time_point start_time;
+    static LogLevel current_level;
+
     static void log_print(LogLevel level, const char *TAG, const char *format, va_list args);
     static uint32_t get_elapsed_ms();
 };
