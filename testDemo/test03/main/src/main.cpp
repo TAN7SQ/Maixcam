@@ -1,23 +1,23 @@
 
-#include "maix_basic.hpp"
 #include "main.h"
+#include "maix_basic.hpp"
 
-#include "opencv2/opencv.hpp"
 #include "opencv2/freetype.hpp"
+#include "opencv2/opencv.hpp"
 
-#include "maix_display.hpp"
 #include "maix_camera.hpp"
+#include "maix_display.hpp"
 #include "maix_image_cv.hpp"
 
 using namespace maix;
 using namespace cv;
 
-#include "maix_basic.hpp"
 #include "main.h"
-#include "opencv2/opencv.hpp"
-#include "maix_display.hpp"
+#include "maix_basic.hpp"
 #include "maix_camera.hpp"
+#include "maix_display.hpp"
 #include "maix_image_cv.hpp"
+#include "opencv2/opencv.hpp"
 
 using namespace maix;
 using namespace cv;
@@ -31,12 +31,10 @@ int _main(int argc, char *argv[])
 
     cam.skip_frames(30); // 跳过开头的30帧
 
-    while (!app::need_exit())
-    {
+    while (!app::need_exit()) {
         // 1. 读取图像，检查是否为空
         image::Image *img = cam.read();
-        if (!img)
-        {
+        if (!img) {
             log::warn("相机读取图像失败！");
             continue; // 跳过本次循环，避免访问空指针
         }
@@ -62,23 +60,18 @@ int _main(int argc, char *argv[])
         // 6. 查找轮廓（关键：contours在每次循环中重新初始化，避免累积）
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
-        cv::findContours(blue_mask, contours, hierarchy,
-                         cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        cv::findContours(blue_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
         // 7. 遍历轮廓，绘制旋转矩形（先检查contours是否为空）
-        if (!contours.empty())
-        {
-            for (size_t i = 0; i < contours.size(); i++)
-            {
+        if (!contours.empty()) {
+            for (size_t i = 0; i < contours.size(); i++) {
                 cv::Rect bound_rect = cv::boundingRect(contours[i]);
                 // 过滤掉过小的轮廓
-                if (bound_rect.area() > 600)
-                {
-                    cv::rectangle(cv_mat,
-                                  bound_rect.tl(), bound_rect.br(),
-                                  cv::Scalar(0, 255, 0), 2);
+                if (bound_rect.area() > 600) {
+                    cv::rectangle(cv_mat, bound_rect.tl(), bound_rect.br(), cv::Scalar(0, 255, 0), 2);
                 }
             }
+            log::info("find %zu contours", contours.size());
         }
 
         // 8. 显示结果，释放内存

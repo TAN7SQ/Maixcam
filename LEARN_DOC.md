@@ -62,6 +62,25 @@ toolchain : musl_t-head
 
 | （推荐使用STA模式，由电脑或者路由开启服务器）
 
+1. 创建wifi.nodhcp `touch /boot/wifi.nodhcp`
+2. 在 `/etc/init.d/S30wifi` 中修改一下的内容，主要修改为使用静态ip的方式
+
+```bash
+wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
+
+sleep 2
+
+if [ -e /boot/wifi.nodhcp ]
+then
+    echo "Using static IP..."
+    ip addr flush dev wlan0
+    ip addr add 192.168.137.50/24 dev wlan0
+    ip route replace default via 192.168.137.1 dev wlan0
+else
+    (udhcpc -i wlan0 -t 10 -T 1 -A 5 -b -p /run/udhcpc.wlan0.pid) &
+fi
+```
+
 ## 使用电脑热点
 
 # 远程调试 STM32

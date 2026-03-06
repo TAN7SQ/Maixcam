@@ -4,6 +4,7 @@ list(APPEND ADD_INCLUDE
     )
 list(APPEND ADD_PRIVATE_INCLUDE 
                         "algorithm/include"
+                        "app/include"
                         )
 ###############################################
 
@@ -13,7 +14,9 @@ list(APPEND ADD_PRIVATE_INCLUDE
 #     )
 append_srcs_dir(ADD_SRCS 
                         "src"
-                        "algorithm/src")       # append source file in src dir to var ADD_SRCS
+                        "algorithm/src"
+                        "app/src"
+                        )       # append source file in src dir to var ADD_SRCS
 # list(REMOVE_ITEM COMPONENT_SRCS "src/test2.c")
 # FILE(GLOB_RECURSE EXTRA_SRC  "src/*.c")
 # FILE(GLOB EXTRA_SRC  "src/*.c")
