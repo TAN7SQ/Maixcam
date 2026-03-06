@@ -12,15 +12,6 @@
 #define ANSI_BLUE "\033[1;34m"
 #define ANSI_PURPLE "\033[1;35m"
 
-typedef enum
-{
-    LOG_LEVEL_INFO = 0,
-    LOG_LEVEL_WARN = 1,
-    LOG_LEVEL_ERROR = 2,
-    LOG_LEVEL_DEBUG = 3,
-    LOG_LEVEL_TRACE = 4
-} LogLevel;
-
 class Log
 {
 public:

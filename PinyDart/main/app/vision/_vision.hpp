@@ -7,7 +7,7 @@ class Vision
 public:
     static constexpr const char *TAG = "Vision";
     void visionSchedule(void);
-    Vision() : pVisionThread(nullptr) {};
+    Vision() : pVisionThread(nullptr), fps() {};
 
     ~Vision();
 
@@ -21,4 +21,6 @@ private:
     const float FOCAL_LENGTH = 1000.0f; // 假设焦距为1000像素
     const int IMG_WIDTH = 640;
     const int IMG_HEIGHT = 480;
+
+    FPSCount fps;
 };

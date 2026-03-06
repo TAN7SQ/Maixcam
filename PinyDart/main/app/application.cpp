@@ -19,12 +19,6 @@ void App::appSchedule()
     vision.visionSchedule();
 
     while (!app::need_exit()) {
-        Log::info("App", "App running...%d", 0);
-        Log::error("App", "App running...%d", 0);
-        Log::debug("App", "App running...%d", 0);
-        Log::trace("App", "App running...%d", 0);
-        Log::warn("App", "App running...%d", 0);
-
         maix::thread::sleep_ms(1000);
     }
 }
