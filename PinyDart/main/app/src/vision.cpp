@@ -21,9 +21,7 @@ const float FOCAL_LENGTH = 1000.0f; // 假设焦距为1000像素
 const int IMG_WIDTH = 640;
 const int IMG_HEIGHT = 480;
 
-namespace mVision
-{
-void vision_thread(void)
+void Vision::vision_thread(void)
 {
     log::info("vision thread start");
 
@@ -40,6 +38,7 @@ void vision_thread(void)
         }
 
         // TODO：视觉识别逻辑
+        
 
         disp.show(*img);
         delete img;
@@ -48,5 +47,3 @@ void vision_thread(void)
 
     log::info("vision thread exit");
 }
-
-} // namespace mVision

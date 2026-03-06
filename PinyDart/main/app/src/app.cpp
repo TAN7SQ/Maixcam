@@ -2,9 +2,12 @@
 
 void App::appInit()
 {
-    
+
 }
 
 void App::appSchedule()
 {
+    App::appInit();
+
+    
 }

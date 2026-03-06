@@ -3,10 +3,10 @@
 
 #pragma once
 
-namespace mVision
+namespace Vision
 {
 
-    void vision_thread(void);
-} // namespace mVision
+void vision_thread(void);
+} // namespace Vision
 
 #endif /* __MVISION_HPP__ */
