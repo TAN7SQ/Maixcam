@@ -22,34 +22,44 @@
 class FPSCount
 {
 public:
-    FPSCount()
+    FPSCount(float alpha = 0.1f) : alpha(alpha)
     {
         last_time = maix::time::ticks_ms();
     }
+
     void tick()
     {
-        frame_cnt++;
         uint64_t now = maix::time::ticks_ms();
         uint64_t delta = now - last_time;
-        if (delta >= 1000) {
-            fps = (float)frame_cnt / (delta / 1000.0f);
-            snprintf(fps_str, sizeof(fps_str), "%.2f FPS", fps);
-            frame_cnt = 0;
-            last_time = now;
+        if (delta == 0)
+            return;
+        float inst_fps = 1000.0f / delta;
+        if (!initialized) {
+            fps = inst_fps;
+            initialized = true;
         }
+        else {
+            fps = (1.0f - alpha) * fps + alpha * inst_fps;
+        }
+        snprintf(fps_str, sizeof(fps_str), "%.2f FPS", fps);
+        last_time = now;
     }
+
     float get() const
     {
         return fps;
     }
+
     const char *str() const
     {
         return fps_str;
     }
 
 private:
-    uint32_t frame_cnt = 0;
     uint64_t last_time = 0;
     float fps = 0.0f;
+    float alpha;
+    bool initialized = false;
+
     char fps_str[32] = {0};
 };

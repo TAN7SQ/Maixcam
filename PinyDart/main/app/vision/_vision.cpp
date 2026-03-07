@@ -26,22 +26,19 @@ void Vision::visionThread(void)
             delete img;
             continue;
         }
-        fps.tick();
         Log::info(TAG, "%s", fps.str());
 
         // TODO：视觉识别逻辑
 
         disp.show(*img);
         delete img;
-        maix::thread::sleep_ms(10);
+        maix::thread::sleep_ms(1);
+        fps.tick();
     }
-
-    Log::info(TAG, "vision thread exit");
 }
 
 Vision::~Vision()
 {
-    Log::info(TAG, "vision thread destroy");
     if (pVisionThread) {
         if (pVisionThread->joinable()) {
             pVisionThread->join();
@@ -49,4 +46,5 @@ Vision::~Vision()
         delete pVisionThread;
         pVisionThread = nullptr;
     }
+    Log::warn(TAG, "vision thread destroy");
 }
