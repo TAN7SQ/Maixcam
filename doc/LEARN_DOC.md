@@ -12,6 +12,17 @@
   5. 在使用 wsl 的时候，由于其是 NAT 模式，可以直接共享主机的梯子，大多数情况下都可以直接下载（但速度较慢，在使用虚拟机的时候需要配置梯子，如果不成功的话就直接手动下载对应的库（速度较快），下载完后不需要解压，只需要放到在 buildlog 中可以需要下载的位置即可，build 会自动解压，当全部需要的依赖库都下载完后，即可重新使用 build，这个过程一般需要重复几次，将所有库下载完即可，[纯命令行翻墙教程](https://github.com/Xizhe-Hao/Clash-for-RaspberryPi-4B?tab=readme-ov-file)。
   6. 下载 filezilla，使用 fscp 登录到开发板（端口号 22），直接右键即可传输文件
   7. 最后在 vscode/powershell 中使用 ssh 登录开发板（基于以太网连接会更加稳定快速，不过 ssh 也不占什么带宽），这些端口在 win 和在 wsl 都可以访问的
+  8. 如果想拔出设备自动断开ssh，而不是卡在ssh界面，可以使用
+```bash
+vi ~/.ssh/config
+
+Host *
+    ServerAliveInterval 10      # 每10秒发送一次心跳
+    ServerAliveCountMax 3       # 3次心跳无响应则断开（总计30秒）
+    ConnectTimeout 5            # 连接超时5秒
+    TCPKeepAlive yes            # 开启TCP层保活（辅助检测）
+    ExitOnForwardFailure yes    # 端口转发失败时直接退出
+```
 
 ## 推荐在 vscode 下载的插件：
 
@@ -63,7 +74,8 @@ toolchain : musl_t-head
 | （推荐使用STA模式，由电脑或者路由开启服务器）
 
 1. 创建wifi.nodhcp `touch /boot/wifi.nodhcp`
-2. 在 `/etc/init.d/S30wifi` 中修改一下的内容，主要修改为使用静态ip的方式
+2. 删除`rm /boot/wifi.ap /boot/wifi.mon`
+3. 在 `/etc/init.d/S30wifi` 中修改一下的内容，主要修改为使用静态ip的方式
 
 ```bash
 wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
@@ -76,6 +88,7 @@ then
     ip addr flush dev wlan0
     ip addr add 192.168.137.50/24 dev wlan0
     ip route replace default via 192.168.137.1 dev wlan0
+    echo "static IP: 192.168.137.50"
 else
     (udhcpc -i wlan0 -t 10 -T 1 -A 5 -b -p /run/udhcpc.wlan0.pid) &
 fi
@@ -84,6 +97,7 @@ fi
 ## 使用电脑热点
 
 # 研发步骤
+
 1. IMU稳定控制 —— 不翻滚
    1. 使用角速度阻尼，使用舵面产生反方向的力矩
 2. 姿态控制 —— 可控pitch yaw

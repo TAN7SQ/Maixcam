@@ -30,8 +30,11 @@ while not app.need_exit():
         area = w * h
 
         if area > max_area:
-            max_area = area
             max_blob = b
+            circularity = b.pixels() / area
+            is_circle = circularity > 0.6
+            if(is_circle):  # 只有是圆形才更新最大blob
+                 max_area = area
 
         img.draw_rect(x, y, w, h, image.COLOR_BLUE)
         bin_img.draw_rect(x, y, w, h, image.COLOR_BLUE)
@@ -46,20 +49,12 @@ while not app.need_exit():
 
         x, y, w, h = max_blob.rect()
 
-        pixels = max_blob.pixels()
-
-        circularity = pixels / (w * h)
-
-        is_circle = circularity > 0.6
-
         if is_circle:
-
             # 绿色框 = 圆形目标
             img.draw_rect(x, y, w, h, image.COLOR_GREEN, 2)
             bin_img.draw_rect(x, y, w, h, image.COLOR_GREEN, 2)
 
             roi_img = img.crop(x, y, w, h)
-
             roi_img.binary(green_lab)
             roi_img.erode(1)
             roi_img.dilate(1)
