@@ -2,18 +2,29 @@
 
 #include "_basic.hpp"
 
+#include "_frameQueue.hpp"
+
 class Vision
 {
 public:
     static constexpr const char *TAG = "Vision";
     void visionSchedule(void);
-    Vision() : pVisionThread(nullptr), fps() {};
+    Vision() : fps() {};
 
     ~Vision();
 
 private:
-    std::thread *pVisionThread;
-    void visionThread(void);
+    /* Camera */
+    maix::camera::Camera *cam;
+    maix::camera::Camera *camRecord = nullptr;
+
+    /* Threads */
+    std::thread *pCameraThread = nullptr;
+    std::thread *pVisionThread = nullptr;
+    std::thread *pRecoderThread = nullptr;
+    void cameraThread(maix::camera::Camera *cam);
+    void visionThread();
+    void recoderThread(maix::camera::Camera *recordCam);
 
     // 引导灯实际尺寸
     const float TARGET_SIZE = 5.0f; // cm
@@ -23,4 +34,6 @@ private:
     const int IMG_HEIGHT = 480;
 
     FPSCount fps;
+    FrameQueue frameQueue{6};
+    FrameQueue recordQueue{6};
 };

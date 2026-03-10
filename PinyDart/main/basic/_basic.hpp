@@ -23,7 +23,7 @@
 class FPSCount
 {
 public:
-    FPSCount(float alpha = 0.1f) : alpha(alpha)
+    FPSCount(float alpha = 0.2f) : alpha(alpha)
     {
         last_time = maix::time::ticks_ms();
     }
@@ -36,7 +36,7 @@ public:
             return;
         float inst_fps = 1000.0f / delta;
         if (!initialized) {
-            fps = inst_fps;
+            fps = 30;
             initialized = true;
         }
         else {
