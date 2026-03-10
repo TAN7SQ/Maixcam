@@ -90,8 +90,8 @@ void Vision::recoderThread(camera::Camera *recordCam)
         image::Image *img = recordCam->read();
         // auto vimg = img->to_format(image::Format::FMT_RGB888);
         img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
-        img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0), 0.1);
-        img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0), 0.5);
+        img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
+        img->draw_arrow(20, 20, 100, 100, image::Color(0, 255, 0), 5);
         auto vimg2 = img->to_format(image::Format::FMT_YVU420SP);
         video::Frame *frame = enc.encode(vimg2);
         // delete vimg;
