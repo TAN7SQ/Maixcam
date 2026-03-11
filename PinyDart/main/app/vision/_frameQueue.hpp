@@ -25,6 +25,12 @@ public:
         cv.notify_one();
     }
 
+    size_t size()
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        return queue.size();
+    }
+
     std::shared_ptr<maix::image::Image> pop()
     {
         std::unique_lock<std::mutex> lock(mtx);

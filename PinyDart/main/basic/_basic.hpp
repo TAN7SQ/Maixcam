@@ -12,8 +12,13 @@
 #include "maix_camera.hpp"
 #include "maix_display.hpp"
 #include "maix_image_cv.hpp"
+#include "maix_rtsp.hpp"
 #include "maix_thread.hpp"
+#include "maix_util.hpp"
 #include "maix_video.hpp"
+
+#include "rtsp_server.h"
+#include "sophgo_middleware.hpp"
 
 #include <thread>
 

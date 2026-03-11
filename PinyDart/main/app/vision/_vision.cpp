@@ -13,9 +13,7 @@ void Vision::visionSchedule(void)
                              CAM_FPS,
                              3,
                              true,
-                             true);
-
-    // camRecord = cam->add_channel(IMG_WIDTH, IMG_HEIGHT, image::Format::FMT_RGB888, CAM_FPS, 3, true);
+                             true); // 实测只有单摄像头模式才能不裁切
 
     if (pCameraThread == nullptr) {
         pCameraThread = new std::thread(&Vision::cameraThread, this, cam);
@@ -70,6 +68,7 @@ void Vision::visionThread()
 
             std::shared_ptr<image::Image> out(gray);
             recordQueue.push(out);
+            // delete gray;
 
         } catch (...) {
             Log::error(TAG, "vision process error");
@@ -77,56 +76,120 @@ void Vision::visionThread()
     }
 }
 
+/**
+ *
+ */
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
 void Vision::recoderThread()
 {
-
     maix::thread::sleep_ms(100);
     Log::info(TAG, "recoder thread start");
 
-    static int skip = 0;
+    const char *PC_IP = "10.104.30.100"; // 改成你的电脑IP
+    const int PORT = 5000;
 
-    video::Encoder enc("/root/test.mp4",
-                       IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
-                       IMG_HEIGHT,
-                       image::Format::FMT_YVU420SP,
-                       video::VideoType::VIDEO_H264,
-                       20, // fps
-                       50,
-                       1200 * 1000, // bitrate
-                       1000,
-                       false,
-                       true);
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = inet_addr(PC_IP);
+
+    uint64_t last_send = 0;
+
+    const int TARGET_FPS = 15;
+    const int FRAME_INTERVAL = 1000 / TARGET_FPS;
 
     while (!app::need_exit()) {
+        while (recordQueue.size() > 1)
+            recordQueue.pop();
 
         auto img = recordQueue.pop();
 
-        if (!img)
+        if (!img) {
+            maix::thread::sleep_ms(1);
+            continue;
+        }
+
+        uint64_t now = time::ticks_ms();
+
+        if (now - last_send < FRAME_INTERVAL)
             continue;
 
-        skip++;
-
-        if (skip % 4 != 0)
-            continue;
+        last_send = now;
 
         try {
-            img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
-            img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
+            img->draw_rect(img->width() / 2 - 100, img->height() / 2 - 60, 200, 120, image::Color(255, 0, 0), 3);
+            img->draw_string(20, 20, fps.str(), image::Color(255, 0, 0));
 
-            auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+            image::Image *jpeg = img->to_format(image::Format::FMT_JPEG);
+            if (!jpeg)
+                continue;
 
-            video::Frame *frame = enc.encode(yuv);
-
-            delete yuv;
-            delete frame;
+            uint8_t *data = (uint8_t *)jpeg->data();
+            int size = jpeg->data_size();
+            sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+            delete jpeg;
         } catch (...) {
-            Log::error(TAG, "encode error");
+            Log::error(TAG, "Recorder error");
         }
     }
 }
 
+// void Vision::recoderThread_just_record_mp4()
+// {
+
+//     maix::thread::sleep_ms(100);
+//     Log::info(TAG, "recoder thread start");
+
+//     static int skip = 0;
+
+//     video::Encoder enc("/root/test.mp4",
+//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
+//                        IMG_HEIGHT,
+//                        image::Format::FMT_YVU420SP,
+//                        video::VideoType::VIDEO_H264,
+//                        20, // fps
+//                        50,
+//                        1200 * 1000, // bitrate
+//                        1000,
+//                        false,
+//                        true);
+
+//     while (!app::need_exit()) {
+
+//         auto img = recordQueue.pop();
+
+//         if (!img)
+//             continue;
+
+//         skip++;
+
+//         if (skip % 4 != 0)
+//             continue;
+
+//         try {
+//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
+//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
+
+//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+
+//             video::Frame *frame = enc.encode(yuv);
+
+//             delete yuv;
+//             delete frame;
+//         } catch (...) {
+//             Log::error(TAG, "encode error");
+//         }
+//     }
+// }
+
 Vision::~Vision()
 {
+    delete cam;
+
     if (pVisionThread) {
         if (pVisionThread->joinable()) {
             pVisionThread->join();

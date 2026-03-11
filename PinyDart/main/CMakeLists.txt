@@ -39,7 +39,7 @@ append_srcs_dir(ADD_SRCS
 ###############################################
 
 ###### Add required/dependent components ######
-list(APPEND ADD_REQUIREMENTS basic vision ext_dev)
+list(APPEND ADD_REQUIREMENTS basic vision ext_dev media_server)
 ###############################################
 
 ###### Add link search path for requirements/libs ######

@@ -30,7 +30,7 @@ private:
     const float TARGET_SIZE = 5.0f; // cm
     // 摄像头内参
     const float FOCAL_LENGTH = 1000.0f; // 假设焦距为1000像素
-    const int CAM_FPS = 60;
+    const int CAM_FPS = 90;
     const int IMG_WIDTH = 512;
     const int IMG_HEIGHT = 320;
 

@@ -4,6 +4,17 @@ using namespace maix;
 
 #include "_easyLog.hpp"
 #include "vision/_vision.hpp"
+
+#include <signal.h>
+
+// static std::atomic<bool> g_exit_flag(false);
+
+// void signal_handler(int sig)
+// {
+//     printf("\nSIGINT received, exiting...\n");
+//     g_exit_flag = true;
+// }
+
 void App::appInit()
 {
 
