@@ -47,7 +47,7 @@ public:
         else {
             fps = (1.0f - alpha) * fps + alpha * inst_fps;
         }
-        snprintf(fps_str, sizeof(fps_str), "%.2f FPS", fps);
+        snprintf(fps_str, sizeof(fps_str), "%.2f", fps);
         last_time = now;
     }
 

@@ -31,11 +31,11 @@ private:
     // 摄像头内参
     const float FOCAL_LENGTH = 1000.0f; // 假设焦距为1000像素
     const int CAM_FPS = 80;
-    const int IMG_WIDTH = 640;
+    const int IMG_WIDTH = 360;
     const int IMG_HEIGHT = 360;
 
     FPSCount cameraFps;
     FPSCount visonFps;
-    FrameQueue frameQueue{6};
-    FrameQueue recordQueue{6};
+    FrameQueue frameQueue;
+    FrameQueue recordQueue;
 };

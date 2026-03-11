@@ -13,7 +13,7 @@ void fusion_thread(void)
 {
     log::info("fusion thread start");
 
-    KalmanFilter kf;
+    // KalmanFilter kf;
 
     while (!app::need_exit()) {
         // TODO：融合逻辑

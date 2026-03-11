@@ -38,55 +38,58 @@ void Vision::visionSchedule(void)
         pthread_setname_np(pRecoderThread->native_handle(), "recoderThread");
     }
 }
+
+/**
+ *
+ */
 void Vision::cameraThread(camera::Camera *cam)
 {
-
     Log::info(TAG, "camera thread start");
 
     while (!app::need_exit()) {
         try {
             maix::image::Image *raw = cam->read();
 
-            if (!raw) {
+            if (!raw)
                 continue;
-            }
+
             std::shared_ptr<image::Image> img(raw);
+
             frameQueue.push(img);
 
             cameraFps.tick();
-            // Log::info(TAG, "%s", cameraFps.str());
         } catch (...) {
             Log::error(TAG, "camera read error");
         }
     }
 }
+
+/**
+ *
+ */
 void Vision::visionThread()
 {
     Log::info(TAG, "vision thread start");
-    std::vector<std::vector<int>> greenThreadshold = {{88, 92, -8, 20, -17, 0}}; // HSV绿色阈值范围
+
+    std::vector<std::vector<int>> greenThresholds = {{0, 80, -120, -10, 0, 30}};
 
     while (!app::need_exit()) {
-
         auto img = frameQueue.pop();
 
-        if (!img) {
+        if (!img)
             continue;
-            maix::thread::sleep_ms(1);
-        }
+
         try {
-            auto out_img = img->copy();
-            // out_img->binary(greenThreadshold);
+            auto blobs = img->find_blobs(
+                greenThresholds, false, {0, 0, img->width(), img->height()}, 2, 2, 50, 50, true, 10, 16, 16);
 
-            // ===== 在这里写视觉算法 =====
-            // detect target / blob / tracking
+            for (auto &blob : blobs) {
+                img->draw_rect(blob.x(), blob.y(), blob.w(), blob.h(), maix::image::COLOR_RED, 2);
+            }
 
-            // Log::info(TAG, "%s", visonFps.str());
+            recordQueue.push(img);
 
-            std::shared_ptr<image::Image> out(out_img);
-            recordQueue.push(out);
             visonFps.tick();
-            // delete gray;
-
         } catch (...) {
             Log::error(TAG, "vision process error");
         }
@@ -104,30 +107,33 @@ void Vision::visionThread()
 #include <fstream>
 #include <string>
 
-float get_cpu_temp()
+std::string get_cpu_temp()
 {
     std::ifstream file("/sys/class/thermal/thermal_zone0/temp");
     if (!file.is_open())
-        return -1;
+        return "error";
 
     int temp;
     file >> temp;
 
-    return temp / 1000.0f;
+    char buf[64];
+    sprintf(buf, "T: %.1f", temp / 1000.0f);
+
+    return buf;
 }
 
 void Vision::recoderThread()
 {
     maix::thread::sleep_ms(100);
+
     Log::info(TAG, "recoder thread start");
 
-    // FIXME:实测如果不连接电脑热点的话会卡死
-    // FIXME:连了也会卡死，但时间会久一点
     const char *PC_IP = "10.104.30.100";
     const int PORT = 5000;
 
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    fcntl(sock, F_SETFL, O_NONBLOCK); // 设置套接字为非阻塞模式
+
+    fcntl(sock, F_SETFL, O_NONBLOCK);
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -136,52 +142,106 @@ void Vision::recoderThread()
 
     uint64_t last_send = 0;
 
-    const int TARGET_FPS = 20;
+    const int TARGET_FPS = 10;
     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
 
     while (!app::need_exit()) {
+        auto img = recordQueue.pop();
 
-        auto img = recordQueue.pop_latest();
-
-        if (!img) {
-            maix::thread::sleep_ms(1);
+        if (!img)
             continue;
-        }
 
         uint64_t now = time::ticks_ms();
 
-        if (now - last_send < FRAME_INTERVAL) {
+        if (now - last_send < FRAME_INTERVAL)
             continue;
-        }
 
         last_send = now;
 
-        image::Image *jpeg = nullptr;
-
         try {
             img->draw_string(10, 10, (std::string("C:") + cameraFps.str()).c_str(), image::Color(255, 0, 0));
-            img->draw_string(10, 20, (std::string("V:") + visonFps.str()).c_str(), image::Color(255, 0, 0));
-            float t = get_cpu_temp();
-            char buf[64];
-            sprintf(buf, "T: %.1fC", t);
-            img->draw_string(10, 30, buf, image::Color(255, 0, 0));
-
-            jpeg = img->to_format(image::Format::FMT_JPEG);
-            if (!jpeg) {
-                delete jpeg;
+            img->draw_string(10, 22, (std::string("V:") + visonFps.str()).c_str(), image::Color(255, 0, 0));
+            img->draw_string(10, 34, get_cpu_temp().c_str(), image::Color(255, 0, 0));
+            image::Image *jpeg = img->to_jpeg(60);
+            if (!jpeg)
                 continue;
-            }
-
             uint8_t *data = (uint8_t *)jpeg->data();
             int size = jpeg->data_size();
             sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
 
             delete jpeg;
         } catch (...) {
-            Log::error(TAG, "Recorder error");
+            Log::error(TAG, "recorder error");
         }
     }
 }
+
+// void Vision::recoderThread()
+// {
+//     maix::thread::sleep_ms(100);
+//     Log::info(TAG, "recoder thread start");
+
+//     // FIXME:实测如果不连接电脑热点的话会卡死
+//     // FIXME:连了也会卡死，但时间会久一点
+//     const char *PC_IP = "10.104.30.100";
+//     const int PORT = 5000;
+
+//     int sock = socket(AF_INET, SOCK_DGRAM, 0);
+//     fcntl(sock, F_SETFL, O_NONBLOCK); // 设置套接字为非阻塞模式
+
+//     struct sockaddr_in addr;
+//     addr.sin_family = AF_INET;
+//     addr.sin_port = htons(PORT);
+//     addr.sin_addr.s_addr = inet_addr(PC_IP);
+
+//     uint64_t last_send = 0;
+
+//     const int TARGET_FPS = 20;
+//     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+//     while (!app::need_exit()) {
+
+//         auto img = recordQueue.pop_latest();
+
+//         if (!img) {
+//             maix::thread::sleep_ms(1);
+//             continue;
+//         }
+
+//         uint64_t now = time::ticks_ms();
+
+//         if (now - last_send < FRAME_INTERVAL) {
+//             continue;
+//         }
+
+//         last_send = now;
+
+//         image::Image *jpeg = nullptr;
+
+//         try {
+//             img->draw_string(10, 10, (std::string("C:") + cameraFps.str()).c_str(), image::Color(255, 0, 0));
+//             img->draw_string(10, 22, (std::string("V:") + visonFps.str()).c_str(), image::Color(255, 0, 0));
+//             float t = get_cpu_temp();
+//             char buf[64];
+//             sprintf(buf, "T: %.1f", t);
+//             img->draw_string(10, 34, buf, image::Color(255, 0, 0));
+
+//             jpeg = img->to_jpeg(50);
+//             if (!jpeg) {
+//                 delete jpeg;
+//                 continue;
+//             }
+
+//             uint8_t *data = (uint8_t *)jpeg->data();
+//             int size = jpeg->data_size();
+//             sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+
+//             delete jpeg;
+//         } catch (...) {
+//             Log::error(TAG, "Recorder error");
+//         }
+//     }
+// }
 
 // void Vision::recoderThread_just_record_mp4()
 // {
