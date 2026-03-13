@@ -22,12 +22,12 @@ void App::appInit()
     Log::info("App", "App init");
 }
 
-void App::appSchedule()
+void App::appSchedule(int argc, char *argv[])
 {
     App::appInit();
 
     Vision vision = Vision();
-    vision.visionSchedule();
+    vision.visionSchedule(argc, argv);
 
     while (!app::need_exit()) {
         maix::thread::sleep_ms(1000);

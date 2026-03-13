@@ -18,7 +18,7 @@ public:
     } maxBlob_t;
 
     static constexpr const char *TAG = "Vision";
-    void visionSchedule(void);
+    void visionSchedule(int argc, char *argv[]);
     Vision() : cameraFps(), visonFps() {};
 
     ~Vision();
@@ -56,4 +56,6 @@ private:
 
     /********************************** */
     maxBlob_t maxblob;
+
+    std::vector<std::vector<int>> greenThresholds = {{60, 100, -80, -10, -30, 10}};
 };

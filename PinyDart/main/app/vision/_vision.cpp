@@ -4,8 +4,21 @@
 
 using namespace maix;
 
-void Vision::visionSchedule(void)
+void Vision::visionSchedule(int argc, char *argv[])
 {
+    if (argc == 7) {
+        int Lmin = std::atoi(argv[1]);
+        int Lmax = std::atoi(argv[2]);
+        int Amin = std::atoi(argv[3]);
+        int Amax = std::atoi(argv[4]);
+        int Bmin = std::atoi(argv[5]);
+        int Bmax = std::atoi(argv[6]);
+
+        greenThresholds = {{Lmin, Lmax, Amin, Amax, Bmin, Bmax}};
+    }
+    else {
+        greenThresholds = {{10, 80, -120, -10, -20, 30}};
+    }
 
     static camera::Camera pCam(IMG_WIDTH,
                                IMG_HEIGHT, //
@@ -24,7 +37,7 @@ void Vision::visionSchedule(void)
     // // pCam.awb_mode(maix::camera::AwbMode::Manual);
     pCam.exposure(200);
     pCam.constrast(100);
-    pCam.iso(15);
+    pCam.iso(30);
 
     pCam.vflip(1);   // 垂直翻转
     pCam.hmirror(1); // 水平镜像
@@ -74,6 +87,7 @@ void Vision::cameraThread(camera::Camera *pcam)
             Log::error(TAG, "camera read error");
         }
     }
+    delete pcam;
 }
 
 /**
@@ -81,21 +95,28 @@ void Vision::cameraThread(camera::Camera *pcam)
  */
 void Vision::visionThread()
 {
+    maix::thread::sleep_ms(100);
+
     Log::info(TAG, "vision thread start");
+    Log::info(TAG,
+              "greenThresholds: %d %d %d %d %d %d",
+              greenThresholds[0][0],
+              greenThresholds[0][1],
+              greenThresholds[0][2],
+              greenThresholds[0][3],
+              greenThresholds[0][4],
+              greenThresholds[0][5]);
 
     while (!app::need_exit()) {
         auto img = frameQueue.pop();
-
         if (!img) {
             maix::thread::sleep_ms(1);
             continue;
         }
         auto new_img = std::shared_ptr<image::Image>(img->copy());
-
         try {
             Vision::targetDetect(new_img);
             Vision::debugInfo(new_img);
-
             recordQueue.push(new_img);
             visonFps.tick();
             maix::thread::sleep_ms(2);
@@ -104,6 +125,127 @@ void Vision::visionThread()
             Log::error(TAG, "vision process error");
         }
     }
+}
+
+/**
+ *
+ */
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+void Vision::recoderThread()
+{
+    maix::thread::sleep_ms(100);
+    Log::info(TAG, "recoder thread start");
+
+    const char *PC_IP = "10.104.30.100";
+    const int PORT = 5000;
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    fcntl(sock, F_SETFL, O_NONBLOCK);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = inet_addr(PC_IP);
+
+    uint64_t last_send = 0;
+
+    const int TARGET_FPS = 15;
+    const int FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+    while (!app::need_exit()) {
+        auto img = recordQueue.pop();
+        if (!img) {
+            maix::thread::sleep_ms(1);
+            continue;
+        }
+        uint64_t now = time::ticks_ms();
+        if (now - last_send < FRAME_INTERVAL)
+            continue;
+        last_send = now;
+        try {
+            // auto rgb = img->to_format(image::Format::FMT_RGB888);
+
+            image::Image *jpeg = img->to_jpeg(30);
+            if (!jpeg)
+                continue;
+            uint8_t *data = (uint8_t *)jpeg->data();
+            int size = jpeg->data_size();
+            sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+
+            delete jpeg;
+            // delete rgb;
+        } catch (...) {
+            Log::error(TAG, "recorder error");
+        }
+        maix::thread::sleep_ms(1);
+    }
+}
+
+// void Vision::recoderThread_just_record_mp4()
+// {
+//     maix::thread::sleep_ms(100);
+//     Log::info(TAG, "recoder thread start");
+//     static int skip = 0;
+//     video::Encoder enc("/root/test.mp4",
+//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
+//                        IMG_HEIGHT,
+//                        image::Format::FMT_YVU420SP,
+//                        video::VideoType::VIDEO_H264,
+//                        20, // fps
+//                        50,
+//                        1200 * 1000, // bitrate
+//                        1000,
+//                        false,
+//                        true);
+//     while (!app::need_exit()) {
+//         auto img = recordQueue.pop();
+//         if (!img)
+//             continue;
+//         skip++;
+//         if (skip % 4 != 0)
+//             continue;
+//         try {
+//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
+//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
+//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+//             video::Frame *frame = enc.encode(yuv);
+//             delete yuv;
+//             delete frame;
+//         } catch (...) {
+//             Log::error(TAG, "encode error");
+//         }
+//     }
+// }
+
+Vision::~Vision()
+{
+
+    if (pVisionThread) {
+        if (pVisionThread->joinable()) {
+            pVisionThread->join();
+        }
+        delete pVisionThread;
+        pVisionThread = nullptr;
+    }
+    if (pRecoderThread) {
+        if (pRecoderThread->joinable()) {
+            pRecoderThread->join();
+        }
+        delete pRecoderThread;
+        pRecoderThread = nullptr;
+    }
+    if (pCameraThread) {
+        if (pCameraThread->joinable())
+            pCameraThread->join();
+        delete pCameraThread;
+    }
+
+    Log::warn(TAG, "vision thread destroy");
 }
 
 /**
@@ -137,7 +279,7 @@ float Vision::calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blo
     int cx = blob.x() + blob.w() / 2;
     int cy = blob.y() + blob.h() / 2;
 
-    const int radius = 2; // 5x5
+    const int radius = 3; // 5x5
     int sum = 0;
     int count = 0;
 
@@ -173,11 +315,10 @@ float Vision::calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blo
 
 void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 {
-    static std::vector<std::vector<int>> greenThresholds = {{40, 100, -120, -10, 0, 30}};
-    // static std::vector<std::vector<int>> greenThresholds = {{0, 80, -120, -10, 0, 30}};
 
     // 下一步可以加上动态ROI
-    const int layROI = 30;
+    const int layROI = 10;
+    // static std::vector<std::vector<int>> greenThresholds = {{0, 80, -120, -10, 0, 30}};
 
     auto blobs = img->find_blobs(greenThresholds,
                                  false,
@@ -186,10 +327,10 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
                                  2,
                                  10,
                                  5,
-                                 false,
-                                 0,
-                                 0,
-                                 0);
+                                 true,
+                                 10,
+                                 16,
+                                 16);
 
     maxblob.pixels = 0;
     maxblob.brightness = 0;
@@ -198,13 +339,13 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 
     for (auto &blob : blobs) {
 
-        float density = blob.pixels() / float(blob.w() * blob.h());
+        // float roundness = blob.roundness();
 
-        if (density > 0.9 && density < 0.25)
-            continue;
-        float brightness = calcBlobCenterBrightness(img.get(), blob);
+        // if (roundness < 0.5)
+        //     continue;
+        float brightness = Vision::calcBlobCenterBrightness(img.get(), blob);
 
-        // 评价函数：亮度 * 像素数
+        // 评价函数：亮度² * 像素数
         float score = brightness * brightness * blob.pixels();
 
         if (score > bestScore) {
@@ -216,15 +357,15 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
             maxblob.h = blob.h();
             maxblob.pixels = blob.pixels();
             maxblob.brightness = brightness;
-            // printf("blob pixels=%d density=%.2f bright=%.1f\n", blob.pixels(), density, brightness);
+            // printf("blob pixels=%d brightness=%.2f\n", blob.pixels(), brightness);
         }
     }
 
     if (maxblob.pixels > 0) {
         int cx = maxblob.x + maxblob.w / 2;
         int cy = maxblob.y + maxblob.h / 2;
-        img->draw_circle(cx, cy, maxblob.w / 2, maix::image::COLOR_RED);
-        img->draw_cross(cx, cy, maix::image::COLOR_RED, 2);
+        img->draw_circle(cx, cy, maxblob.w / 2, maix::image::COLOR_RED, 3);
+        img->draw_cross(cx, cy, maix::image::COLOR_RED, 3);
     }
 }
 
@@ -233,212 +374,6 @@ void Vision::debugInfo(std::shared_ptr<maix::image::Image> img)
     img->draw_string(10, 10, (std::string("C:") + cameraFps.str()).c_str(), image::COLOR_WHITE);
     img->draw_string(10, 22, (std::string("V:") + visonFps.str()).c_str(), image::COLOR_WHITE);
     img->draw_string(10, 34, Temp::get_cpu_temp().c_str(), image::COLOR_WHITE);
-}
-
-/**
- *
- */
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-void Vision::recoderThread()
-{
-    maix::thread::sleep_ms(100);
-
-    Log::info(TAG, "recoder thread start");
-
-    const char *PC_IP = "10.104.30.100";
-    const int PORT = 5000;
-
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-
-    fcntl(sock, F_SETFL, O_NONBLOCK);
-
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(PORT);
-    addr.sin_addr.s_addr = inet_addr(PC_IP);
-
-    uint64_t last_send = 0;
-
-    const int TARGET_FPS = 15;
-    const int FRAME_INTERVAL = 1000 / TARGET_FPS;
-
-    while (!app::need_exit()) {
-        auto img = recordQueue.pop();
-
-        if (!img) {
-            maix::thread::sleep_ms(1);
-            continue;
-        }
-
-        uint64_t now = time::ticks_ms();
-
-        if (now - last_send < FRAME_INTERVAL)
-            continue;
-
-        last_send = now;
-
-        try {
-            // auto rgb = img->to_format(image::Format::FMT_RGB888);
-
-            image::Image *jpeg = img->to_jpeg(60);
-            if (!jpeg)
-                continue;
-            uint8_t *data = (uint8_t *)jpeg->data();
-            int size = jpeg->data_size();
-            sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
-
-            delete jpeg;
-            // delete rgb;
-        } catch (...) {
-            Log::error(TAG, "recorder error");
-        }
-        maix::thread::sleep_ms(1);
-    }
-}
-
-// void Vision::recoderThread()
-// {
-//     maix::thread::sleep_ms(100);
-//     Log::info(TAG, "recoder thread start");
-
-//     // FIXME:实测如果不连接电脑热点的话会卡死
-//     // FIXME:连了也会卡死，但时间会久一点
-//     const char *PC_IP = "10.104.30.100";
-//     const int PORT = 5000;
-
-//     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-//     fcntl(sock, F_SETFL, O_NONBLOCK); // 设置套接字为非阻塞模式
-
-//     struct sockaddr_in addr;
-//     addr.sin_family = AF_INET;
-//     addr.sin_port = htons(PORT);
-//     addr.sin_addr.s_addr = inet_addr(PC_IP);
-
-//     uint64_t last_send = 0;
-
-//     const int TARGET_FPS = 20;
-//     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
-
-//     while (!app::need_exit()) {
-
-//         auto img = recordQueue.pop_latest();
-
-//         if (!img) {
-//             maix::thread::sleep_ms(1);
-//             continue;
-//         }
-
-//         uint64_t now = time::ticks_ms();
-
-//         if (now - last_send < FRAME_INTERVAL) {
-//             continue;
-//         }
-
-//         last_send = now;
-
-//         image::Image *jpeg = nullptr;
-
-//         try {
-//             img->draw_string(10, 10, (std::string("C:") + cameraFps.str()).c_str(), image::Color(255, 0, 0));
-//             img->draw_string(10, 22, (std::string("V:") + visonFps.str()).c_str(), image::Color(255, 0, 0));
-//             float t = get_cpu_temp();
-//             char buf[64];
-//             sprintf(buf, "T: %.1f", t);
-//             img->draw_string(10, 34, buf, image::Color(255, 0, 0));
-
-//             jpeg = img->to_jpeg(50);
-//             if (!jpeg) {
-//                 delete jpeg;
-//                 continue;
-//             }
-
-//             uint8_t *data = (uint8_t *)jpeg->data();
-//             int size = jpeg->data_size();
-//             sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
-
-//             delete jpeg;
-//         } catch (...) {
-//             Log::error(TAG, "Recorder error");
-//         }
-//     }
-// }
-
-// void Vision::recoderThread_just_record_mp4()
-// {
-
-//     maix::thread::sleep_ms(100);
-//     Log::info(TAG, "recoder thread start");
-
-//     static int skip = 0;
-
-//     video::Encoder enc("/root/test.mp4",
-//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
-//                        IMG_HEIGHT,
-//                        image::Format::FMT_YVU420SP,
-//                        video::VideoType::VIDEO_H264,
-//                        20, // fps
-//                        50,
-//                        1200 * 1000, // bitrate
-//                        1000,
-//                        false,
-//                        true);
-
-//     while (!app::need_exit()) {
-
-//         auto img = recordQueue.pop();
-
-//         if (!img)
-//             continue;
-
-//         skip++;
-
-//         if (skip % 4 != 0)
-//             continue;
-
-//         try {
-//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
-//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
-
-//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
-
-//             video::Frame *frame = enc.encode(yuv);
-
-//             delete yuv;
-//             delete frame;
-//         } catch (...) {
-//             Log::error(TAG, "encode error");
-//         }
-//     }
-// }
-
-Vision::~Vision()
-{
-
-    if (pVisionThread) {
-        if (pVisionThread->joinable()) {
-            pVisionThread->join();
-        }
-        delete pVisionThread;
-        pVisionThread = nullptr;
-    }
-    if (pRecoderThread) {
-        if (pRecoderThread->joinable()) {
-            pRecoderThread->join();
-        }
-        delete pRecoderThread;
-        pRecoderThread = nullptr;
-    }
-    if (pCameraThread) {
-        if (pCameraThread->joinable())
-            pCameraThread->join();
-        delete pCameraThread;
-    }
-
-    Log::warn(TAG, "vision thread destroy");
 }
 
 //----------------------------------------------------

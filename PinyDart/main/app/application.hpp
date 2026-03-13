@@ -8,7 +8,7 @@ public:
     App() = default;
     ~App() = default;
 
-    void appSchedule();
+    void appSchedule(int argc, char *argv[]);
 
 private:
     void appInit();
