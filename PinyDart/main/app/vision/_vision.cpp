@@ -27,8 +27,8 @@ void Vision::visionSchedule(const VisionConfig &config)
     pCam.constrast(100);
     pCam.iso(30);
 
-    pCam.vflip(1);   // 垂直翻转
-    pCam.hmirror(1); // 水平镜像
+    pCam.vflip(1);
+    pCam.hmirror(1);
 
     if (pCameraThread == nullptr) {
         pCameraThread = new std::thread(&Vision::cameraThread, this, &pCam);
@@ -147,8 +147,6 @@ void Vision::recoderThread()
             continue;
         last_send = now;
         try {
-            // auto rgb = img->to_format(image::Format::FMT_RGB888);
-
             image::Image *jpeg = img->to_jpeg(30);
             if (!jpeg)
                 continue;
@@ -157,49 +155,12 @@ void Vision::recoderThread()
             sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
 
             delete jpeg;
-            // delete rgb;
         } catch (...) {
             Log::error(TAG, "recorder error");
         }
         maix::thread::sleep_ms(1);
     }
 }
-
-// void Vision::recoderThread_just_record_mp4()
-// {
-//     maix::thread::sleep_ms(100);
-//     Log::info(TAG, "recoder thread start");
-//     static int skip = 0;
-//     video::Encoder enc("/root/test.mp4",
-//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
-//                        IMG_HEIGHT,
-//                        image::Format::FMT_YVU420SP,
-//                        video::VideoType::VIDEO_H264,
-//                        20, // fps
-//                        50,
-//                        1200 * 1000, // bitrate
-//                        1000,
-//                        false,
-//                        true);
-//     while (!app::need_exit()) {
-//         auto img = recordQueue.pop();
-//         if (!img)
-//             continue;
-//         skip++;
-//         if (skip % 4 != 0)
-//             continue;
-//         try {
-//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
-//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
-//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
-//             video::Frame *frame = enc.encode(yuv);
-//             delete yuv;
-//             delete frame;
-//         } catch (...) {
-//             Log::error(TAG, "encode error");
-//         }
-//     }
-// }
 
 Vision::~Vision()
 {
@@ -295,7 +256,6 @@ float Vision::calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blo
 void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 {
 
-    // 下一步可以加上动态ROI
     const int layROI = 10;
     // static std::vector<std::vector<int>> greenThresholds = {{0, 80, -120, -10, 0, 30}};
 
@@ -320,13 +280,8 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 
     for (auto &blob : blobs) {
 
-        // float roundness = blob.roundness();
-
-        // if (roundness < 0.5)
-        //     continue;
         float brightness = Vision::calcBlobCenterBrightness(img.get(), blob);
 
-        // 评价函数：亮度² * 像素数
         float score = brightness * brightness * blob.pixels();
 
         if (score > bestScore && score / last_best_score > 0.6) {
@@ -358,80 +313,38 @@ void Vision::debugInfo(std::shared_ptr<maix::image::Image> img)
     img->draw_string(10, 34, Temp::get_cpu_temp().c_str(), image::COLOR_WHITE);
 }
 
-//----------------------------------------------------
-// struct LedTarget
+// void Vision::recoderThread_just_record_mp4()
 // {
-//     int x = -1;
-//     int y = -1;
-//     int brightness = 0;
-// };
-
-// LedTarget Vision::detectGreenLED(maix::image::Image *img)
-// {
-//     LedTarget best;
-
-//     const int step = 2; // 每2像素扫描一次，速度×4
-//     const int w = img->width();
-//     const int h = img->height();
-
-//     for (int y = 10; y < h - 10; y += step) {
-//         for (int x = 10; x < w - 10; x += step) {
-//             auto c = img->get_pixel(x, y);
-
-//             int r = c[0];
-//             int g = c[1];
-//             int b = c[2];
-
-//             // 绿色过滤
-//             if (g < r + 30)
-//                 continue;
-//             if (g < b + 30)
-//                 continue;
-
-//             // 亮度
-//             int bright = (299 * r + 587 * g + 114 * b) / 1000;
-
-//             if (bright < 120)
-//                 continue;
-
-//             // 找最亮
-//             if (bright > best.brightness) {
-//                 best.x = x;
-//                 best.y = y;
-//                 best.brightness = bright;
-//             }
+//     maix::thread::sleep_ms(100);
+//     Log::info(TAG, "recoder thread start");
+//     static int skip = 0;
+//     video::Encoder enc("/root/test.mp4",
+//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
+//                        IMG_HEIGHT,
+//                        image::Format::FMT_YVU420SP,
+//                        video::VideoType::VIDEO_H264,
+//                        20, // fps
+//                        50,
+//                        1200 * 1000, // bitrate
+//                        1000,
+//                        false,
+//                        true);
+//     while (!app::need_exit()) {
+//         auto img = recordQueue.pop();
+//         if (!img)
+//             continue;
+//         skip++;
+//         if (skip % 4 != 0)
+//             continue;
+//         try {
+//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
+//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
+//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+//             video::Frame *frame = enc.encode(yuv);
+//             delete yuv;
+//             delete frame;
+//         } catch (...) {
+//             Log::error(TAG, "encode error");
 //         }
 //     }
-
-//     return best;
-// }
-// bool Vision::confirmLED(maix::image::Image *img, int cx, int cy)
-// {
-//     int count = 0;
-
-//     for (int dy = -2; dy <= 2; dy++) {
-//         for (int dx = -2; dx <= 2; dx++) {
-//             auto c = img->get_pixel(cx + dx, cy + dy);
-
-//             int r = c[0], g = c[1], b = c[2];
-
-//             if (g > r + 20 && g > b + 20)
-//                 count++;
-//         }
-//     }
-
-//     return count > 8;
-// }
-// void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
-// {
-//     auto led = detectGreenLED(img.get());
-
-//     if (led.brightness == 0)
-//         return;
-
-//     if (!confirmLED(img.get(), led.x, led.y))
-//         return;
-
-//     img->draw_cross(led.x, led.y, maix::image::COLOR_RED, 3);
-//     img->draw_circle(led.x, led.y, 8, maix::image::COLOR_RED);
 // }

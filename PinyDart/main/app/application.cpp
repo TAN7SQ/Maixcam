@@ -27,7 +27,6 @@ void App::appSchedule(int argc, char *argv[])
         Log::info("App", "use custom config: %s", config_path.c_str());
     }
     else {
-        config_path = "/root/config/config.json";
         Log::info("App", "use default config");
     }
     AppConfig config;
