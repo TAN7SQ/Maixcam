@@ -11,5 +11,5 @@ public:
     void appSchedule(int argc, char *argv[]);
 
 private:
-    void appInit();
+    void appInit(int argc, char *argv[]);
 };

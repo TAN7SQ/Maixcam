@@ -4,21 +4,10 @@
 
 using namespace maix;
 
-void Vision::visionSchedule(int argc, char *argv[])
+void Vision::visionSchedule(const VisionConfig &config)
 {
-    if (argc == 7) {
-        int Lmin = std::atoi(argv[1]);
-        int Lmax = std::atoi(argv[2]);
-        int Amin = std::atoi(argv[3]);
-        int Amax = std::atoi(argv[4]);
-        int Bmin = std::atoi(argv[5]);
-        int Bmax = std::atoi(argv[6]);
 
-        greenThresholds = {{Lmin, Lmax, Amin, Amax, Bmin, Bmax}};
-    }
-    else {
-        greenThresholds = {{10, 80, -120, -10, -20, 30}};
-    }
+    _config = config;
 
     static camera::Camera pCam(IMG_WIDTH,
                                IMG_HEIGHT, //
@@ -34,15 +23,12 @@ void Vision::visionSchedule(int argc, char *argv[])
     }
 
     pCam.exp_mode(maix::camera::AeMode::Manual);
-    // // pCam.awb_mode(maix::camera::AwbMode::Manual);
     pCam.exposure(200);
     pCam.constrast(100);
     pCam.iso(30);
 
     pCam.vflip(1);   // 垂直翻转
     pCam.hmirror(1); // 水平镜像
-
-    // Log::warn(TAG, "exp:%d,gain:%d", pCam.exposure(-1), pCam.gain(-1));
 
     if (pCameraThread == nullptr) {
         pCameraThread = new std::thread(&Vision::cameraThread, this, &pCam);
@@ -98,14 +84,7 @@ void Vision::visionThread()
     maix::thread::sleep_ms(100);
 
     Log::info(TAG, "vision thread start");
-    Log::info(TAG,
-              "greenThresholds: %d %d %d %d %d %d",
-              greenThresholds[0][0],
-              greenThresholds[0][1],
-              greenThresholds[0][2],
-              greenThresholds[0][3],
-              greenThresholds[0][4],
-              greenThresholds[0][5]);
+    ConfigJson::print_vision(_config);
 
     while (!app::need_exit()) {
         auto img = frameQueue.pop();
@@ -320,7 +299,7 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
     const int layROI = 10;
     // static std::vector<std::vector<int>> greenThresholds = {{0, 80, -120, -10, 0, 30}};
 
-    auto blobs = img->find_blobs(greenThresholds,
+    auto blobs = img->find_blobs(_config.find_blobs.green_thresholds,
                                  false,
                                  {layROI, layROI, img->width() - layROI, img->height() - layROI},
                                  2,
@@ -337,6 +316,8 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 
     float bestScore = 0;
 
+    static float last_best_score;
+
     for (auto &blob : blobs) {
 
         // float roundness = blob.roundness();
@@ -348,7 +329,7 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
         // 评价函数：亮度² * 像素数
         float score = brightness * brightness * blob.pixels();
 
-        if (score > bestScore) {
+        if (score > bestScore && score / last_best_score > 0.6) {
             bestScore = score;
 
             maxblob.x = blob.x();
@@ -360,6 +341,7 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
             // printf("blob pixels=%d brightness=%.2f\n", blob.pixels(), brightness);
         }
     }
+    last_best_score = bestScore;
 
     if (maxblob.pixels > 0) {
         int cx = maxblob.x + maxblob.w / 2;

@@ -2,6 +2,7 @@
 
 #include "_basic.hpp"
 
+#include "_configJson.hpp"
 #include "_frameQueue.hpp"
 
 class Vision
@@ -18,9 +19,10 @@ public:
     } maxBlob_t;
 
     static constexpr const char *TAG = "Vision";
-    void visionSchedule(int argc, char *argv[]);
-    Vision() : cameraFps(), visonFps() {};
 
+    void visionSchedule(const VisionConfig &config);
+
+    Vision() : cameraFps(), visonFps() {};
     ~Vision();
 
 private:
@@ -57,5 +59,5 @@ private:
     /********************************** */
     maxBlob_t maxblob;
 
-    std::vector<std::vector<int>> greenThresholds = {{60, 100, -80, -10, -30, 10}};
+    VisionConfig _config; // json配置文件数据
 };

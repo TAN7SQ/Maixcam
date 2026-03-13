@@ -7,15 +7,9 @@ using namespace maix;
 
 #include <signal.h>
 
-// static std::atomic<bool> g_exit_flag(false);
+#include "_configJson.hpp"
 
-// void signal_handler(int sig)
-// {
-//     printf("\nSIGINT received, exiting...\n");
-//     g_exit_flag = true;
-// }
-
-void App::appInit()
+void App::appInit(int argc, char *argv[])
 {
 
     Log::init();
@@ -24,10 +18,27 @@ void App::appInit()
 
 void App::appSchedule(int argc, char *argv[])
 {
-    App::appInit();
+    App::appInit(argc, argv);
 
+    std::string config_path = "/root/config/config.json";
+
+    if (argc >= 2) {
+        config_path = argv[1];
+        Log::info("App", "use custom config: %s", config_path.c_str());
+    }
+    else {
+        config_path = "/root/config/config.json";
+        Log::info("App", "use default config");
+    }
+    AppConfig config;
+    if (!ConfigJson::load(config_path, config)) {
+        Log::error("App", "load config file failed: %s", config_path.c_str());
+        return;
+    }
+
+    /********************************************************* */
     Vision vision = Vision();
-    vision.visionSchedule(argc, argv);
+    vision.visionSchedule(config.vision);
 
     while (!app::need_exit()) {
         maix::thread::sleep_ms(1000);

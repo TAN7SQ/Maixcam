@@ -1,7 +1,7 @@
 #include "_easyLog.hpp"
 
 std::chrono::steady_clock::time_point Log::start_time;
-Log::LogLevel Log::current_level = Log::LOG_LEVEL_INFO;
+Log::LogLevel Log::current_level = Log::LOG_LEVEL_TRACE;
 
 void Log::init()
 {

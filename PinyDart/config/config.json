@@ -1,0 +1,27 @@
+{
+  "vision": {
+    "find_blobs": {
+      "green_thresholds": [[60, 100, -80, -10, -30, 10]],
+      "min_area": 50,
+      "max_area": 5000,
+      "led_brightness_threshold": 120
+    },
+    "udp": {
+      "is_enabled": true,
+      "udp_ip": "192.168.1.100",
+      "udp_port": 5000
+    }
+  },
+
+  "control": {
+    "kp": 0.8,
+    "ki": 0.02,
+    "kd": 0.1,
+    "max_speed": 2.0
+  },
+
+  "network": {
+    "wifi_ssid": "test_wifi",
+    "wifi_password": "12345678"
+  }
+}

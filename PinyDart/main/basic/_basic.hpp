@@ -13,6 +13,7 @@
 #include "maix_basic.hpp"
 #include "maix_camera.hpp"
 #include "maix_display.hpp"
+#include "maix_err.hpp"
 #include "maix_image_cv.hpp"
 #include "maix_rtsp.hpp"
 #include "maix_thread.hpp"
