@@ -37,6 +37,7 @@ private:
     void cameraThread(maix::camera::Camera *pcam);
     void visionThread();
     void recoderThread();
+    void recoderThread_just_record_mp4(void);
 
     float calcBlobBrightness(maix::image::Image *img, maix::image::Blob &blob);
     float calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blob &blob);
@@ -60,4 +61,7 @@ private:
     maxBlob_t maxblob;
 
     VisionConfig _config; // json配置文件数据
+
+    int sock;
+    struct sockaddr_in addr;
 };

@@ -21,6 +21,8 @@ bool ConfigJson::load(const std::string &filename, AppConfig &config)
             return false;
         }
         auto v = j["vision"];
+        auto u = v["udp"];
+        auto m = v["mp4"];
         auto fb = v["find_blobs"];
 
         config.vision.find_blobs.green_thresholds =
@@ -30,8 +32,14 @@ bool ConfigJson::load(const std::string &filename, AppConfig &config)
         config.vision.find_blobs.max_area = fb.value("max_area", 5000);
         config.vision.find_blobs.led_brightness_threshold = fb.value("led_brightness_threshold", 120);
 
-        config.vision.udp.udp_ip = v.value("udp_ip", "192.168.1.100");
-        config.vision.udp.udp_port = v.value("udp_port", 5000);
+        config.vision.udp.is_enabled = u.value("is_enabled", true);
+        config.vision.udp.udp_ip = u.value("udp_ip", "10.104.30.100");
+        config.vision.udp.udp_port = u.value("udp_port", 5000);
+
+        config.vision.mp4.is_enabled = m.value("is_enabled", true);
+        config.vision.mp4.fps = m.value("mp4_fps", 15);
+        config.vision.mp4.bitrate = m.value("bitrate", 1210000);
+        config.vision.mp4.mp4_path = m.value("mp4_path", "/root/mp4/record.mp4");
     } catch (std::exception &e) {
         std::cerr << "Error: Failed to parse config file " << filename << std::endl;
         return false;
@@ -62,5 +70,11 @@ void ConfigJson::print_vision(const VisionConfig &config)
     Log::trace(TAG, "led_brightness_threshold: %d", config.find_blobs.led_brightness_threshold);
     Log::trace(TAG, "udp_ip: %s", config.udp.udp_ip.c_str());
     Log::trace(TAG, "udp_port: %d", config.udp.udp_port);
+    printf("\n");
+
+    Log::trace(TAG, "is_enabled: %d", config.mp4.is_enabled);
+    Log::trace(TAG, "fps: %d", config.mp4.fps);
+    Log::trace(TAG, "bitrate: %d", config.mp4.bitrate);
+    Log::trace(TAG, "mp4_path: %s", config.mp4.mp4_path.c_str());
     printf("--------------------------------------------\n");
 }

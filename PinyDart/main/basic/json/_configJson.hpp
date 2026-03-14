@@ -18,6 +18,14 @@ struct VisionConfig
         std::string udp_ip;
         int udp_port;
     } udp;
+
+    struct
+    {
+        bool is_enabled;
+        int fps;
+        int bitrate;
+        std::string mp4_path;
+    } mp4;
 };
 
 struct ControlConfig

@@ -2,6 +2,8 @@
 
 #include "_basic.hpp"
 
+#include "_configJson.hpp"
+
 class App
 {
 public:
@@ -11,5 +13,6 @@ public:
     void appSchedule(int argc, char *argv[]);
 
 private:
+    AppConfig config;
     void appInit(int argc, char *argv[]);
 };

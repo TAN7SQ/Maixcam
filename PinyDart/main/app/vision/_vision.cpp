@@ -6,7 +6,7 @@ using namespace maix;
 
 void Vision::visionSchedule(const VisionConfig &config)
 {
-
+    // json data
     _config = config;
 
     static camera::Camera pCam(IMG_WIDTH,
@@ -45,7 +45,12 @@ void Vision::visionSchedule(const VisionConfig &config)
 }
 
 /**
- *
+ ██████╗ █████╗ ███╗   ███╗███████╗██████╗  █████╗
+██╔════╝██╔══██╗████╗ ████║██╔════╝██╔══██╗██╔══██╗
+██║     ███████║██╔████╔██║█████╗  ██████╔╝███████║
+██║     ██╔══██║██║╚██╔╝██║██╔══╝  ██╔══██╗██╔══██║
+╚██████╗██║  ██║██║ ╚═╝ ██║███████╗██║  ██║██║  ██║
+ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
  */
 void Vision::cameraThread(camera::Camera *pcam)
 {
@@ -77,7 +82,12 @@ void Vision::cameraThread(camera::Camera *pcam)
 }
 
 /**
- *
+██╗   ██╗██╗███████╗██╗ ██████╗ ███╗   ██╗
+██║   ██║██║██╔════╝██║██╔═══██╗████╗  ██║
+██║   ██║██║███████╗██║██║   ██║██╔██╗ ██║
+╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║
+ ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║
+  ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
  */
 void Vision::visionThread()
 {
@@ -107,60 +117,182 @@ void Vision::visionThread()
 }
 
 /**
- *
+██████╗ ███████╗ ██████╗ ██████╗ ██████╗ ██████╗ ███████╗██████╗
+██╔══██╗██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔══██╗
+██████╔╝█████╗  ██║     ██║   ██║██████╔╝██║  ██║█████╗  ██████╔╝
+██╔══██╗██╔══╝  ██║     ██║   ██║██╔══██╗██║  ██║██╔══╝  ██╔══██╗
+██║  ██║███████╗╚██████╗╚██████╔╝██║  ██║██████╔╝███████╗██║  ██║
+╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝
  */
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 void Vision::recoderThread()
 {
     maix::thread::sleep_ms(100);
     Log::info(TAG, "recoder thread start");
 
-    const char *PC_IP = "10.104.30.100";
-    const int PORT = 5000;
-
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-
-    fcntl(sock, F_SETFL, O_NONBLOCK);
-
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(PORT);
-    addr.sin_addr.s_addr = inet_addr(PC_IP);
-
     uint64_t last_send = 0;
 
     const int TARGET_FPS = 15;
     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
+    /***************************************************** */
+    if (_config.udp.is_enabled) {
+        const char *PC_IP = _config.udp.udp_ip.c_str();
+        const int PORT = _config.udp.udp_port;
+
+        sock = socket(AF_INET, SOCK_DGRAM, 0);
+        fcntl(sock, F_SETFL, O_NONBLOCK);
+
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(PORT);
+        addr.sin_addr.s_addr = inet_addr(PC_IP);
+        Log::info(TAG, "upd start");
+    }
+    /***************************************************** */
+    // std::unique_ptr<video::Encoder> enc;
+
+    // if (_config.mp4.is_enabled) {
+    //     enc = std::make_unique<video::Encoder>(_config.mp4.mp4_path.c_str(),
+    //                                            IMG_WIDTH,
+    //                                            IMG_HEIGHT,
+    //                                            image::Format::FMT_YVU420SP,
+    //                                            video::VideoType::VIDEO_H264,
+    //                                            _config.mp4.fps,
+    //                                            50,
+    //                                            _config.mp4.bitrate,
+    //                                            1000,
+    //                                            false,
+    //                                            true);
+    //     Log::info(TAG, "mp4 start");
+    // }
 
     while (!app::need_exit()) {
+
         auto img = recordQueue.pop();
         if (!img) {
             maix::thread::sleep_ms(1);
             continue;
         }
+
         uint64_t now = time::ticks_ms();
-        if (now - last_send < FRAME_INTERVAL)
+        if (now - last_send < FRAME_INTERVAL) {
+            maix::thread::sleep_ms(2);
             continue;
+        }
+
         last_send = now;
         try {
-            image::Image *jpeg = img->to_jpeg(30);
-            if (!jpeg)
-                continue;
-            uint8_t *data = (uint8_t *)jpeg->data();
-            int size = jpeg->data_size();
-            sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+            if (_config.udp.is_enabled) {
+                std::unique_ptr<image::Image> jpeg(img->to_jpeg(30));
+                if (jpeg) {
+                    int ret = sendto(sock, jpeg->data(), jpeg->data_size(), 0, (struct sockaddr *)&addr, sizeof(addr));
+                    if (ret < 0)
+                        Log::warn(TAG, "sendto error %d", ret);
+                }
+            }
 
-            delete jpeg;
+            // if (_config.mp4.is_enabled && enc) {
+            //     auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+            //     video::Frame *frame = enc->encode(yuv);
+            //     delete yuv;
+            //     delete frame;
+            //     Log::trace(TAG, "encode frame");
+            // }
         } catch (...) {
-            Log::error(TAG, "recorder error");
+            Log::error(TAG, "recoder thread error");
         }
         maix::thread::sleep_ms(1);
     }
 }
+
+// void Vision::recoderThread()
+// {
+//     maix::thread::sleep_ms(100);
+//     Log::info(TAG, "recoder thread start");
+
+//     uint64_t last_send = 0;
+
+//     const int TARGET_FPS = 15;
+//     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
+//     /***************************************************** */
+
+//     const char *PC_IP = _config.udp.udp_ip.c_str();
+//     const int PORT = _config.udp.udp_port;
+
+//     sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+//     fcntl(sock, F_SETFL, O_NONBLOCK);
+
+//     addr.sin_family = AF_INET;
+//     addr.sin_port = htons(PORT);
+//     addr.sin_addr.s_addr = inet_addr(PC_IP);
+
+//     /***************************************************** */
+
+//     while (!app::need_exit()) {
+//         auto img = recordQueue.pop();
+//         if (!img) {
+//             maix::thread::sleep_ms(1);
+//             continue;
+//         }
+//         uint64_t now = time::ticks_ms();
+//         if (now - last_send < FRAME_INTERVAL)
+//             continue;
+//         last_send = now;
+//         try {
+//             if (_config.udp.is_enabled) {
+//                 image::Image *jpeg = img->to_jpeg(30);
+//                 if (!jpeg)
+//                     continue;
+//                 uint8_t *data = (uint8_t *)jpeg->data();
+//                 int size = jpeg->data_size();
+//                 sendto(sock, data, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+
+//                 delete jpeg;
+//             }
+
+//         } catch (...) {
+//             Log::error(TAG, "recorder error");
+//         }
+//         maix::thread::sleep_ms(1);
+//     }
+// }
+
+void Vision::recoderThread_just_record_mp4(void)
+{
+    maix::thread::sleep_ms(100);
+    Log::info(TAG, "recoder thread start");
+    static int skip = 0;
+    video::Encoder enc("/root/test.mp4",
+                       IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
+                       IMG_HEIGHT,
+                       image::Format::FMT_YVU420SP,
+                       video::VideoType::VIDEO_H264,
+                       20, // fps
+                       50,
+                       1200 * 1000, // bitrate
+                       1000,
+                       false,
+                       true);
+
+    while (!app::need_exit()) {
+        auto img = recordQueue.pop();
+        if (!img)
+            continue;
+        skip++;
+        if (skip % 4 != 0)
+            continue;
+        try {
+            auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+            video::Frame *frame = enc.encode(yuv);
+            delete yuv;
+            delete frame;
+        } catch (...) {
+            Log::error(TAG, "encode error");
+        }
+    }
+}
+
+/********************************************************************* */
 
 Vision::~Vision()
 {
@@ -188,9 +320,6 @@ Vision::~Vision()
     Log::warn(TAG, "vision thread destroy");
 }
 
-/**
- * 检测所有像素
- */
 float Vision::calcBlobBrightness(maix::image::Image *img, maix::image::Blob &blob)
 {
     int sum = 0;
@@ -237,9 +366,6 @@ float Vision::calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blo
             int g = c[1];
             int b = c[2];
 
-            // 过滤白色反光、黄色灯、噪声
-            // if (g < r * 1.2 || g < b * 1.2)
-            //     continue;
             int yv = (299 * r + 587 * g + 114 * b) / 1000;
 
             sum += yv;
@@ -280,6 +406,9 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
 
     for (auto &blob : blobs) {
 
+        if (blob.pixels() < maxblob.pixels)
+            continue;
+
         float brightness = Vision::calcBlobCenterBrightness(img.get(), blob);
 
         float score = brightness * brightness * blob.pixels();
@@ -312,39 +441,3 @@ void Vision::debugInfo(std::shared_ptr<maix::image::Image> img)
     img->draw_string(10, 22, (std::string("V:") + visonFps.str()).c_str(), image::COLOR_WHITE);
     img->draw_string(10, 34, Temp::get_cpu_temp().c_str(), image::COLOR_WHITE);
 }
-
-// void Vision::recoderThread_just_record_mp4()
-// {
-//     maix::thread::sleep_ms(100);
-//     Log::info(TAG, "recoder thread start");
-//     static int skip = 0;
-//     video::Encoder enc("/root/test.mp4",
-//                        IMG_WIDTH, // 这个是编码格式，调用下方的resize函数调整到这个尺寸，编码效率更高
-//                        IMG_HEIGHT,
-//                        image::Format::FMT_YVU420SP,
-//                        video::VideoType::VIDEO_H264,
-//                        20, // fps
-//                        50,
-//                        1200 * 1000, // bitrate
-//                        1000,
-//                        false,
-//                        true);
-//     while (!app::need_exit()) {
-//         auto img = recordQueue.pop();
-//         if (!img)
-//             continue;
-//         skip++;
-//         if (skip % 4 != 0)
-//             continue;
-//         try {
-//             img->draw_string(10, 10, fps.str(), image::Color(255, 0, 0));
-//             img->draw_rect(0, 0, img->width(), img->height(), image::Color(255, 0, 0), 5);
-//             auto yuv = img->to_format(image::Format::FMT_YVU420SP);
-//             video::Frame *frame = enc.encode(yuv);
-//             delete yuv;
-//             delete frame;
-//         } catch (...) {
-//             Log::error(TAG, "encode error");
-//         }
-//     }
-// }

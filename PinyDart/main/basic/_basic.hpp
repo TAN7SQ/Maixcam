@@ -5,6 +5,11 @@
 #include <cstring>
 #include <iostream>
 
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 //================================================================
 
 #include "opencv2/freetype.hpp"

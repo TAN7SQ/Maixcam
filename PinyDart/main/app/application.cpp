@@ -14,11 +14,7 @@ void App::appInit(int argc, char *argv[])
 
     Log::init();
     Log::info("App", "App init");
-}
-
-void App::appSchedule(int argc, char *argv[])
-{
-    App::appInit(argc, argv);
+    /********************************************************* */
 
     std::string config_path = "/root/config/config.json";
 
@@ -29,13 +25,20 @@ void App::appSchedule(int argc, char *argv[])
     else {
         Log::info("App", "use default config");
     }
-    AppConfig config;
+
     if (!ConfigJson::load(config_path, config)) {
         Log::error("App", "load config file failed: %s", config_path.c_str());
         return;
     }
+    /********************************************************* */
+}
+
+void App::appSchedule(int argc, char *argv[])
+{
+    App::appInit(argc, argv);
 
     /********************************************************* */
+
     Vision vision = Vision();
     vision.visionSchedule(config.vision);
 

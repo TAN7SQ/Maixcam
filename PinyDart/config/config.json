@@ -8,8 +8,14 @@
     },
     "udp": {
       "is_enabled": true,
-      "udp_ip": "192.168.1.100",
+      "udp_ip": "10.104.30.100",
       "udp_port": 5000
+    },
+    "mp4": {
+      "is_enabled": true,
+      "mp4_fps": 20,
+      "bitrate": 1200000,
+      "mp4_path": "/root/mp4/record.mp4"
     }
   },
 
