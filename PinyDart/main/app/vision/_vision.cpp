@@ -181,22 +181,50 @@ void Vision::recoderThread()
 
         last_send = now;
         try {
-            if (_config.udp.is_enabled) {
-                std::unique_ptr<image::Image> jpeg(img->to_jpeg(30));
-                if (jpeg) {
-                    int ret = sendto(sock, jpeg->data(), jpeg->data_size(), 0, (struct sockaddr *)&addr, sizeof(addr));
-                    if (ret < 0)
-                        Log::warn(TAG, "sendto error %d", ret);
-                }
-            }
+            // if (_config.udp.is_enabled) {
+            //     std::unique_ptr<image::Image> jpeg(img->to_jpeg(30));
+            //     if (jpeg) {
+            //         int ret = sendto(sock, jpeg->data(), jpeg->data_size(), 0, (struct sockaddr *)&addr,
+            //         sizeof(addr)); if (ret < 0)
+            //             Log::warn(TAG, "sendto error %d", ret);
+            //     }
+            // }
 
             maix::thread::sleep_ms(1);
             if (_config.mp4.is_enabled && enc) {
                 auto yuv = img->to_format(image::Format::FMT_YVU420SP);
-                video::Frame *frame = enc->encode(yuv);
+                video::Frame *frame = enc->encode(yuv); // 这里已经顺便内录了
+
+                /********************* */
+                if (frame) {
+                    static uint16_t frame_id = 0;
+                    const int PACKET = 1400;
+                    const int HEADER = 8;
+                    const int PAYLOAD = PACKET - HEADER;
+
+                    uint8_t *data = frame->data();
+                    int size = frame->size();
+
+                    int total = (size + PAYLOAD - 1) / PAYLOAD;
+
+                    for (int i = 0; i < total; i++) {
+                        uint8_t packet[PACKET];
+
+                        uint16_t *h = (uint16_t *)packet;
+                        h[0] = frame_id;
+                        h[1] = i;
+                        h[2] = total;
+                        h[3] = std::min(PAYLOAD, size - i * PAYLOAD);
+
+                        memcpy(packet + HEADER, data + i * PAYLOAD, h[3]);
+                        sendto(sock, packet, h[3] + HEADER, 0, (struct sockaddr *)&addr, sizeof(addr));
+                    }
+                    frame_id++;
+                }
+                /********************* */
+
                 delete yuv;
                 delete frame;
-                // Log::trace(TAG, "encode frame");
             }
         } catch (...) {
             Log::error(TAG, "recoder thread error");
