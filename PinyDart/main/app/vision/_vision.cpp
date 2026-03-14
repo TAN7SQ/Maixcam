@@ -148,22 +148,22 @@ void Vision::recoderThread()
         Log::info(TAG, "upd start");
     }
     /***************************************************** */
-    // std::unique_ptr<video::Encoder> enc;
+    std::unique_ptr<video::Encoder> enc;
 
-    // if (_config.mp4.is_enabled) {
-    //     enc = std::make_unique<video::Encoder>(_config.mp4.mp4_path.c_str(),
-    //                                            IMG_WIDTH,
-    //                                            IMG_HEIGHT,
-    //                                            image::Format::FMT_YVU420SP,
-    //                                            video::VideoType::VIDEO_H264,
-    //                                            _config.mp4.fps,
-    //                                            50,
-    //                                            _config.mp4.bitrate,
-    //                                            1000,
-    //                                            false,
-    //                                            true);
-    //     Log::info(TAG, "mp4 start");
-    // }
+    if (_config.mp4.is_enabled) {
+        enc = std::make_unique<video::Encoder>(_config.mp4.mp4_path.c_str(),
+                                               IMG_WIDTH,
+                                               IMG_HEIGHT,
+                                               image::Format::FMT_YVU420SP,
+                                               video::VideoType::VIDEO_H264,
+                                               _config.mp4.fps,
+                                               50,
+                                               _config.mp4.bitrate,
+                                               1000,
+                                               false,
+                                               true);
+        Log::info(TAG, "mp4 start");
+    }
 
     while (!app::need_exit()) {
 
@@ -190,13 +190,14 @@ void Vision::recoderThread()
                 }
             }
 
-            // if (_config.mp4.is_enabled && enc) {
-            //     auto yuv = img->to_format(image::Format::FMT_YVU420SP);
-            //     video::Frame *frame = enc->encode(yuv);
-            //     delete yuv;
-            //     delete frame;
-            //     Log::trace(TAG, "encode frame");
-            // }
+            maix::thread::sleep_ms(1);
+            if (_config.mp4.is_enabled && enc) {
+                auto yuv = img->to_format(image::Format::FMT_YVU420SP);
+                video::Frame *frame = enc->encode(yuv);
+                delete yuv;
+                delete frame;
+                // Log::trace(TAG, "encode frame");
+            }
         } catch (...) {
             Log::error(TAG, "recoder thread error");
         }
