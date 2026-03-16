@@ -17,6 +17,7 @@ void fusion_thread(void)
 
     while (!app::need_exit()) {
         // TODO：融合逻辑
+        // TODO: 带姿态补偿的LOS
 
         test_kalman();
 

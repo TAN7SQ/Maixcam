@@ -93,12 +93,10 @@ void Uart::parseProtocol(uint8_t *buf, int len)
             switch (frame.type) {
             case (uint8_t)MsgType::IMU: {
                 memcpy(&data, frame.payload, sizeof(IMURawData));
-                // Log::info(TAG, "imu: %f, %f, %f", data.gyro.x, data.gyro.y, data.gyro.z);
                 break;
             }
             case (uint8_t)MsgType::BARO: {
                 memcpy(&baroData, frame.payload, sizeof(BaroData));
-                // Log::info(TAG, "baro: %f, %f, %f", baroData.temperature, baroData.pressure_mbar, baroData.height);
                 break;
             }
             case (uint8_t)MsgType::ATTITUDE:
