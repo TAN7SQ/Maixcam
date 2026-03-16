@@ -20,7 +20,7 @@ peripheral::uart::UART *Uart::uartInit(void)
         this->TAG = (char *)"uart1";
         Log::info(TAG, "port:%d,baud:%d", this->port, this->baud);
         auto fdport = "/dev/ttyS1"s;
-        int uart_baudrate = 115200;
+        int uart_baudrate = 1500000;
 
         this->set_uart_pin("A19", "UART1_TX");
         this->set_uart_pin("A18", "UART1_RX");
@@ -59,138 +59,89 @@ void Uart::run()
         maix::thread::sleep_ms(1);
         if (serial->available() > 0) {
             int n = serial->read(buf, sizeof(buf));
-            if (n > 0) {
-                printf("uart read %d bytes: ", n);
-                for (int i = 0; i < n; i++) {
-                    printf("%02X ", buf[i]);
-                }
-                printf("\n");
-                protocol_parse(buf, n);
+            if (n <= 0) {
+                continue;
+            }
+
+            parseProtocol(buf, n);
+        }
+    }
+}
+
+int Uart::read(uint8_t *buf, int len)
+{
+    if (!buf || len <= 0)
+        return -1;
+
+    return this->serial->read(buf, len);
+}
+
+int Uart::write(const uint8_t *buf, int len)
+{
+    if (!buf || len <= 0)
+        return -1;
+
+    return this->serial->write(buf, len);
+}
+
+void Uart::parseProtocol(uint8_t *buf, int len)
+{
+    static UartFrameParser parser;
+    static Frame frame;
+    for (int i = 0; i < len; i++) {
+        if (parser.input(buf[i], frame)) {
+            switch (frame.type) {
+            case (uint8_t)MsgType::IMU: {
+                memcpy(&data, frame.payload, sizeof(IMURawData));
+                // Log::info(TAG, "imu: %f, %f, %f", data.gyro.x, data.gyro.y, data.gyro.z);
+                break;
+            }
+            case (uint8_t)MsgType::BARO: {
+                memcpy(&baroData, frame.payload, sizeof(BaroData));
+                // Log::info(TAG, "baro: %f, %f, %f", baroData.temperature, baroData.pressure_mbar, baroData.height);
+                break;
+            }
+            case (uint8_t)MsgType::ATTITUDE:
+                Log::info(TAG, "attitude");
+                break;
+            case (uint8_t)MsgType::CONTROL:
+                Log::info(TAG, "control");
+                break;
+            default:
+                Log::error(TAG, "unknown type:%d", frame.type);
+                break;
             }
         }
     }
 }
 
-// int Uart::read(uint8_t *buf, int len)
-// {
-//     if (!buf || len <= 0)
-//         return -1;
-
-//     return this->serial.read(buf, len, -1, 0);
-// }
-
-// int Uart::write(const uint8_t *buf, int len)
-// {
-//     if (!buf || len <= 0)
-//         return -1;
-
-//     return this->serial.write(buf, len);
-// }
-
-void Uart::protocol_parse(uint8_t *buf, int len)
+int Uart::sendProtocol(MsgType type, const void *payload, uint16_t payloadLength)
 {
-    static ParseState state = ParseState::WAIT_SOF;
+    if (!payload || payloadLength <= 0)
+        return -1;
 
-    static uint8_t headerBuf[sizeof(FrameHeader)];
-    static uint16_t headerIndex = 0;
+    const uint8_t SOF = 0xAA;
 
-    static FrameHeader header;
+    // AA  | TYPE | LEN | PAYLOAD | CRC16
+    uint16_t frameLength = 1 + 1 + 2 + payloadLength + 2;
 
-    static uint8_t payload[MAX_PAYLOAD];
-    static uint16_t payloadIndex = 0;
+    if (frameLength > MAX_PAYLOAD)
+        return -1;
+    uint16_t index = 0;
 
-    static uint8_t crcBuf[2];
-    static uint8_t crcIndex = 0;
+    uint8_t frame[frameLength];
+    frame[index++] = SOF;
+    frame[index++] = (uint8_t)type;
+    frame[index++] = payloadLength & 0xFF;
+    frame[index++] = (payloadLength >> 8) & 0xFF;
+    memcpy(frame + index, payload, payloadLength);
+    index += payloadLength;
 
-    static uint16_t lastSeq = 0;
+    uint16_t crc = Tools::crc16_ccitt(frame + 1, index - 2);
+    frame[index++] = crc & 0xFF;
+    frame[index++] = (crc >> 8) & 0xFF;
 
-    for (int i = 0; i < len; i++) {
-
-        uint8_t byte = buf[i];
-
-        switch (state) {
-        case ParseState::WAIT_SOF:
-            if (byte == SOF) {
-                headerBuf[0] = byte;
-                headerIndex = 1;
-                state = ParseState::READ_HEADER;
-            }
-            break;
-        case ParseState::READ_HEADER:
-            headerBuf[headerIndex++] = byte;
-            if (headerIndex == sizeof(FrameHeader)) {
-                memcpy(&header, headerBuf, sizeof(FrameHeader));
-
-                if (header.len > MAX_PAYLOAD) {
-                    state = ParseState::WAIT_SOF;
-                    break;
-                }
-                payloadIndex = 0;
-                state = ParseState::READ_PAYLOAD;
-            }
-            break;
-        case ParseState::READ_PAYLOAD:
-
-            payload[payloadIndex++] = byte;
-
-            if (payloadIndex == header.len) {
-
-                crcIndex = 0;
-                state = ParseState::READ_CRC;
-            }
-
-            break;
-        case ParseState::READ_CRC:
-
-            crcBuf[crcIndex++] = byte;
-
-            if (crcIndex == 2) {
-                uint16_t recvCrc = crcBuf[0] | (crcBuf[1] << 8);
-                uint16_t calcCrc = Tools::crc16_ccitt(headerBuf, sizeof(FrameHeader));
-                calcCrc = Tools::crc16_ccitt(payload, header.len, calcCrc);
-                if (recvCrc == calcCrc) {
-
-                    if (header.seq != lastSeq + 1 && lastSeq != 0) {
-                        Log::warn(this->TAG, "packet lost seq=%d last=%d", header.seq, lastSeq);
-                    }
-
-                    lastSeq = header.seq;
-
-                    switch (header.type) {
-
-                    case (uint8_t)MsgType::IMU:
-                        if (header.len == sizeof(IMUAttitude)) {
-                            IMUAttitude att;
-
-                            memcpy(&att, payload, sizeof(att));
-
-                            printf("roll  = %f\n", att.euler.roll);
-                            printf("pitch = %f\n", att.euler.pitch);
-                            printf("yaw   = %f\n", att.euler.yaw);
-                        }
-                        break;
-
-                    case (uint8_t)MsgType::BARO:
-                        break;
-
-                    case (uint8_t)MsgType::ATTITUDE:
-                        break;
-
-                    case (uint8_t)MsgType::CONTROL:
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-                else {
-                    Log::warn(this->TAG, "crc error");
-                }
-                state = ParseState::WAIT_SOF;
-            }
-            break;
-        }
-    }
+    return this->write(frame, frameLength);
 }
 
 Uart::~Uart()

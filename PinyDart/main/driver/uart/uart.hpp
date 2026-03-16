@@ -7,28 +7,15 @@
 
 using namespace maix;
 
-#pragma pack(push, 1)
-struct FrameHeader
-{
-    uint8_t sof;
-    uint8_t version;
-    uint8_t type;
-    uint8_t flags;
-    uint16_t seq;
-    uint16_t len;
-};
-#pragma pack(pop)
+#include "uart_parse.hpp"
 
 enum class MsgType : uint8_t
 {
     IMU = 1,
     BARO = 2,
     ATTITUDE = 3,
-
     CONTROL = 10,
-
     _SYSTEM = 20,
-
     _DEBUG = 100,
 };
 
@@ -51,10 +38,7 @@ public:
 
     void uartSchedule();
 
-    int read(uint8_t *buf, int len);
-    int write(const uint8_t *buf, int len);
     void run();
-    void protocol_parse(uint8_t *buf, int len);
 
 private:
     UartPort port;
@@ -62,8 +46,16 @@ private:
     peripheral::uart::UART *serial = nullptr;
     std::thread *pUartThread = nullptr;
 
+    IMURawData data;
+    BaroData baroData;
+
 private:
     peripheral::uart::UART *uartInit(void);
+
+    int read(uint8_t *buf, int len);
+    int write(const uint8_t *buf, int len);
+    void parseProtocol(uint8_t *buf, int len);
+    int sendProtocol(MsgType type, const void *payload, uint16_t length);
 
     bool set_uart_pin(const std::string &pin, const std::string &function)
     {

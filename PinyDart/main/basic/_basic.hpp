@@ -63,6 +63,14 @@ struct IMUAttitude
     Vec3 quat;
 };
 
+struct BaroData
+{
+    double temperature = 0.0;   // 温度(℃)
+    double pressure_mbar = 0.0; // 压力(mbar)
+    double pressure_pa = 0.0;   // 压力(Pa)
+    double height = 0.0;        // 高度(m)
+};
+
 //================================================================
 
 class FPSCount
