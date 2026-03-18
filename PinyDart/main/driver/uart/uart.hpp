@@ -29,7 +29,7 @@ public:
     };
 
 public:
-    char *TAG = "uart";
+    const char *TAG = "uart";
 
     Uart(UartPort _port, int _baud) : port(_port), baud(_baud)
     {

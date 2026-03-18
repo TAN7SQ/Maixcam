@@ -4,10 +4,14 @@ list(APPEND ADD_INCLUDE
     )
 list(APPEND ADD_PRIVATE_INCLUDE 
                         "algorithm/lpf"
+                        
                         "basic"
                         "basic/log"
                         "basic/json"
+                        "basic/shared"
+                        
                         "driver/uart"
+                        
                         "app"
                         "app/vision"
                         "app/fusion"
@@ -21,10 +25,14 @@ list(APPEND ADD_PRIVATE_INCLUDE
 append_srcs_dir(ADD_SRCS 
                         "src"
                         "algorithm/lpf"
+                        
                         "basic"
                         "basic/log"
                         "basic/json"
+                        "basic/shared"
+
                         "driver/uart"
+                        
                         "app"
                         "app/vision"
                         "app/fusion"

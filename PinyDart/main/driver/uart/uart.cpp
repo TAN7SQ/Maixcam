@@ -20,12 +20,11 @@ peripheral::uart::UART *Uart::uartInit(void)
         this->TAG = (char *)"uart1";
         Log::info(TAG, "port:%d,baud:%d", this->port, this->baud);
         auto fdport = "/dev/ttyS1"s;
-        int uart_baudrate = 1500000;
 
         this->set_uart_pin("A19", "UART1_TX");
         this->set_uart_pin("A18", "UART1_RX");
 
-        static peripheral::uart::UART serial = peripheral::uart::UART(std::string(fdport), uart_baudrate);
+        static peripheral::uart::UART serial = peripheral::uart::UART(std::string(fdport), this->baud);
 
         Log::info(TAG, "init uart1 success");
         return &serial;

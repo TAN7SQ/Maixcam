@@ -7,6 +7,8 @@
 
 #include "lpf.hpp"
 
+#include "_shared.hpp"
+
 class Vision
 {
 public:
@@ -39,7 +41,8 @@ public:
 
     void visionSchedule(const VisionConfig &config);
 
-    Vision() : cameraFps(), visonFps(), cxLpf(0.05f), cyLpf(0.05f) {};
+    Vision(SharedQueue<Target> &_targetQueue)
+        : cameraFps(), visonFps(), cxLpf(0.05f), cyLpf(0.05f), targetQueue(_targetQueue) {};
     ~Vision();
 
     /********************************** */
@@ -53,12 +56,13 @@ private:
     void recoderThread();
     void recoderThread_just_record_mp4(void);
 
+    void targetDetect(std::shared_ptr<maix::image::Image> img);
+    void debugInfo(std::shared_ptr<maix::image::Image> img);
+
+    /*--------------------------------------------------------------------- */
     float calcBlobBrightness(maix::image::Image *img, maix::image::Blob &blob);
     float calcBlobCenterBrightness(maix::image::Image *img, maix::image::Blob &blob);
     SubpixelResult calcBlobSubpixelCenter(maix::image::Image *img, maix::image::Blob &blob);
-
-    void targetDetect(std::shared_ptr<maix::image::Image> img);
-    void debugInfo(std::shared_ptr<maix::image::Image> img);
 
     /********************************** */
 private:
@@ -86,4 +90,6 @@ private:
     /********************************** */
     LPF cxLpf;
     LPF cyLpf;
+
+    SharedQueue<Target> &targetQueue;
 };
