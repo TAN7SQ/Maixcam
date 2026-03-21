@@ -10,6 +10,9 @@
 #include <mutex>
 #include <thread>
 
+std::atomic<bool> threadRun(true);
+
+
 using namespace maix;
 
 uint16_t Tools::crc16_ccitt(const uint8_t *data, int len)

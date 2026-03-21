@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <atomic>
+
 //================================================================
 
 #include "opencv2/freetype.hpp"
@@ -72,14 +74,22 @@ struct BaroData
 };
 
 //================================================================
-struct Target
+struct CamTargetData
 {
-    float cx;
-    float cy;
-    float vx;
-    float vy;
+    bool valid = false;
+    float area = 0.0f;
+
+    float normX = 0.0f; // 去畸变后的归一化坐标 (用于制导)
+    float normY = 0.0f;
+    float rawCx = 0.0f; // 原始像素坐标 (用于画图调试)
+    float rawCy = 0.0f;
+
+    float yawCam = 0.0f;
+    float pitchCam = 0.0f;
 };
 //================================================================
+
+extern std::atomic<bool> threadRun;
 
 class FPSCount
 {

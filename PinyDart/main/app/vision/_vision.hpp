@@ -35,16 +35,6 @@ public:
         float brightness;
     };
 
-    struct TargetData
-    {
-        bool valid = false;
-        float area = 0.0f;
-        float normX = 0.0f; // 去畸变后的归一化坐标 (用于制导)
-        float normY = 0.0f;
-        float rawCx = 0.0f; // 原始像素坐标 (用于画图调试)
-        float rawCy = 0.0f;
-    } target;
-
     typedef struct
     {
         int x;
@@ -67,9 +57,11 @@ public:
 
     void visionSchedule(const VisionConfig &config);
 
-    Vision(SharedQueue<Target> &_targetQueue)
+    Vision(SharedQueue<CamTargetData> &_targetQueue)
         : cameraFps(), visonFps(), cxLpf(0.05f), cyLpf(0.05f), targetQueue(_targetQueue) {};
     ~Vision();
+
+    void deThread();
 
     /********************************** */
 private:
@@ -110,6 +102,7 @@ private:
 
     /********************************** */
     maxBlob_t maxblob;
+    CamTargetData target;
 
     VisionConfig _config; // json配置文件数据
 
@@ -120,5 +113,5 @@ private:
     LPF cxLpf;
     LPF cyLpf;
 
-    SharedQueue<Target> &targetQueue;
+    SharedQueue<CamTargetData> &targetQueue;
 };

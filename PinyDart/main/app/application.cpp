@@ -12,7 +12,9 @@ using namespace maix;
 
 #include "_shared.hpp"
 
-SharedQueue<Target> globalTargetQueue;
+#include "_basic.hpp"
+
+SharedQueue<CamTargetData> globalTargetQueue;
 
 void App::appInit(int argc, char *argv[])
 {
@@ -44,10 +46,13 @@ void App::appSchedule(int argc, char *argv[])
     Uart uart1(Uart::UART1, 1500000);
     uart1.uartSchedule();
 
-    Vision vision = Vision(globalTargetQueue);
+    Vision vision(globalTargetQueue);
     vision.visionSchedule(config.vision);
 
     while (!app::need_exit()) {
         maix::thread::sleep_ms(100);
     }
+    threadRun = false;
+    vision.deThread();
+    uart1.deinit();
 }

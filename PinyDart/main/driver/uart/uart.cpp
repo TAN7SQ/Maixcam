@@ -54,7 +54,7 @@ void Uart::run()
         return;
     }
     uint8_t buf[256];
-    while (!app::need_exit()) {
+    while (threadRun) {
         maix::thread::sleep_ms(1);
         if (serial->available() > 0) {
             int n = serial->read(buf, sizeof(buf));
@@ -65,6 +65,7 @@ void Uart::run()
             parseProtocol(buf, n);
         }
     }
+    // serial->close();
 }
 
 int Uart::read(uint8_t *buf, int len)
@@ -143,9 +144,17 @@ int Uart::sendProtocol(MsgType type, const void *payload, uint16_t payloadLength
 
 Uart::~Uart()
 {
+}
+
+void Uart::deinit()
+{
     if (this->pUartThread != nullptr) {
         this->pUartThread->join();
         delete this->pUartThread;
         this->pUartThread = nullptr;
     }
+    if (this->serial) {
+        this->serial->close();
+    }
+    Log::info(TAG, "deinit");
 }

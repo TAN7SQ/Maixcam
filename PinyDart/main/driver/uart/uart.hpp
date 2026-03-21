@@ -40,6 +40,8 @@ public:
 
     void run();
 
+    void deinit(void);
+
 private:
     UartPort port;
     long baud;

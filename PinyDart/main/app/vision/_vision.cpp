@@ -98,7 +98,7 @@ void Vision::visionThread()
     Log::info(TAG, "vision thread start");
     ConfigJson::print_vision(_config);
 
-    while (!app::need_exit()) {
+    while (threadRun) {
         auto img = frameQueue.pop();
         if (!img) {
             maix::thread::sleep_ms(1);
@@ -168,7 +168,7 @@ void Vision::recoderThread()
     //     Log::info(TAG, "mp4 start");
     // }
 
-    while (!app::need_exit()) {
+    while (threadRun) {
 
         // auto img = frameQueue.pop();
         auto img = recordQueue.pop();
@@ -290,7 +290,7 @@ void Vision::recoderThread_just_record_mp4(void)
                        false,
                        true);
 
-    while (!app::need_exit()) {
+    while (threadRun) {
         auto img = recordQueue.pop();
         if (!img)
             continue;
@@ -312,7 +312,29 @@ void Vision::recoderThread_just_record_mp4(void)
 
 Vision::~Vision()
 {
+    if (pVisionThread) {
+        if (pVisionThread->joinable()) {
+            pVisionThread->join();
+        }
+        delete pVisionThread;
+        pVisionThread = nullptr;
+    }
+    if (pRecoderThread) {
+        if (pRecoderThread->joinable()) {
+            pRecoderThread->join();
+        }
+        delete pRecoderThread;
+        pRecoderThread = nullptr;
+    }
+    if (pCameraThread) {
+        if (pCameraThread->joinable())
+            pCameraThread->join();
+        delete pCameraThread;
+    }
+}
 
+void Vision::deThread(void)
+{
     if (pVisionThread) {
         if (pVisionThread->joinable()) {
             pVisionThread->join();
@@ -477,11 +499,14 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
             maxblob.pixels = blob.pixels();
             maxblob.brightness = brightness;
 
+            //************************************************************************************** */
             undistortPoint(maxblob.cx, maxblob.cy, target.normX, target.normY);
             target.valid = true;
             target.rawCx = maxblob.cx;
             target.rawCy = maxblob.cy;
             target.area = (maxblob.w / 2) * (maxblob.w / 2) * 3.1415926f;
+            target.yawCam = std::atan(target.normX);
+            target.pitchCam = std::atan(target.normY);
         }
         else {
             target.valid = false;
@@ -489,11 +514,11 @@ void Vision::targetDetect(std::shared_ptr<maix::image::Image> img)
     }
 
     if (maxblob.pixels > 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "R:%.1f, %.1f", maxblob.cx, maxblob.cy);
-        img->draw_string(maxblob.cx, maxblob.cy, buf, maix::image::COLOR_RED);
-        snprintf(buf, sizeof(buf), "T:%.4f, %.4f", target.normX, target.normY);
-        img->draw_string(maxblob.cx, maxblob.cy + 30, buf, maix::image::COLOR_RED);
+        // char buf[128];
+        // snprintf(buf, sizeof(buf), "R:%.1f, %.1f", maxblob.cx, maxblob.cy);
+        // img->draw_string(maxblob.cx, maxblob.cy, buf, maix::image::COLOR_RED);
+        // snprintf(buf, sizeof(buf), "T:%.4f, %.4f", target.normX, target.normY);
+        // img->draw_string(maxblob.cx, maxblob.cy + 30, buf, maix::image::COLOR_RED);
 
         img->draw_circle(maxblob.cx, maxblob.cy, maxblob.w / 2, maix::image::COLOR_RED, 3);
         img->draw_cross(maxblob.cx, maxblob.cy, maix::image::COLOR_RED, 3);
