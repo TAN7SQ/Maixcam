@@ -9,29 +9,33 @@
 class FrameQueue
 {
 public:
-    FrameQueue(size_t max_size = 3) : max_size(max_size)
+    FrameQueue(size_t max_size = 1) : max_size(max_size)
     {
+    }
+
+    ~FrameQueue()
+    {
+        clear();
     }
 
     void push(std::shared_ptr<maix::image::Image> img)
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        if (queue.size() >= max_size) {
-            queue.pop(); // 丢掉最旧帧
+        if (!queue.empty()) {
+            queue.pop();
         }
 
         queue.push(img);
-        cv.notify_one();
     }
 
-    std::shared_ptr<maix::image::Image> pop()
+    std::shared_ptr<maix::image::Image> pop_non_blocking()
     {
-        std::unique_lock<std::mutex> lock(mtx);
+        std::lock_guard<std::mutex> lock(mtx);
 
-        cv.wait(lock, [this] {
-            return !queue.empty();
-        });
+        if (queue.empty()) {
+            return nullptr;
+        }
 
         auto img = queue.front();
         queue.pop();
@@ -44,45 +48,16 @@ public:
         return queue.size();
     }
 
+    void clear()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        while (!queue.empty()) {
+            queue.pop();
+        }
+    }
+
 private:
     std::queue<std::shared_ptr<maix::image::Image>> queue;
-
     std::mutex mtx;
-    std::condition_variable cv;
-
     size_t max_size;
 };
-
-// class FrameQueue
-// {
-// public:
-//     void push(std::shared_ptr<maix::image::Image> img)
-//     {
-//         std::lock_guard<std::mutex> lock(mtx);
-
-//         while (!queue.empty())
-//             queue.pop();
-
-//         queue.push(img);
-//         cv.notify_one();
-//     }
-
-//     std::shared_ptr<maix::image::Image> pop()
-//     {
-//         std::unique_lock<std::mutex> lock(mtx);
-
-//         cv.wait(lock, [this] {
-//             return !queue.empty();
-//         });
-
-//         auto img = queue.front();
-//         queue.pop();
-
-//         return img;
-//     }
-
-// private:
-//     std::queue<std::shared_ptr<maix::image::Image>> queue;
-//     std::mutex mtx;
-//     std::condition_variable cv;
-// };

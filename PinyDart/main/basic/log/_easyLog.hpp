@@ -10,8 +10,6 @@
 #include <string>
 #include <thread>
 
-#include "_shared.hpp"
-
 #define ANSI_RESET "\033[0m"
 #define ANSI_RED "\033[1;31m"
 #define ANSI_GREEN "\033[1;32m"
@@ -35,7 +33,7 @@ public:
     {
         start_time = std::chrono::steady_clock::now();
         running = true;
-        log_thread = std::thread(log_worker);
+        log_thread = std::thread(logThread);
     }
 
     static void shutdown()
@@ -172,9 +170,9 @@ private:
         cv.notify_one();
     }
 
-    static void log_worker()
+    static void logThread()
     {
-        while (Shared::threadRun) {
+        while (running) {
             std::unique_lock<std::mutex> lock(mtx);
 
             cv.wait(lock, [] {

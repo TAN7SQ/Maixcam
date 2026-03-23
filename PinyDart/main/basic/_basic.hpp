@@ -112,7 +112,11 @@ namespace Shared
 extern std::atomic<bool> threadRun;
 extern SharedQueue<CamTargetData> gTargetQueue;
 extern SharedQueue<IMUAttitude> gImuAttitude;
-
+static void reset()
+{
+    gTargetQueue.clear();
+    gImuAttitude.clear();
+}
 }; // namespace Shared
 
 class FPSCount

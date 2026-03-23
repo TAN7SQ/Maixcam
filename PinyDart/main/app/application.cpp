@@ -47,8 +47,8 @@ void App::appSchedule(int argc, char *argv[])
     Vision vision;
     vision.visionSchedule(config.vision);
 
-    Fusion fusion;
-    fusion.fusionSchedule(config.fusion);
+    // Fusion fusion;
+    // fusion.fusionSchedule(config.fusion);
 
     while (!app::need_exit()) {
         maix::thread::sleep_ms(100);
@@ -57,5 +57,6 @@ void App::appSchedule(int argc, char *argv[])
     uart1.deinit();
     vision.deThread();
     // fusion.deThread();
+    Shared::reset();
     Log::shutdown();
 }

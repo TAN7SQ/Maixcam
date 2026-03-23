@@ -7,29 +7,29 @@ void Vision::visionSchedule(const VisionConfig &config)
     // json data
     _config = config;
 
-    static camera::Camera pCam(IMG_WIDTH,
-                               IMG_HEIGHT, //
-                               image::Format::FMT_RGB888,
-                               nullptr,
-                               CAM_FPS,
-                               3,
-                               true,
-                               true); // 实测只有单摄像头模式才能不裁切
+    this->_cam = new camera::Camera(IMG_WIDTH,
+                                    IMG_HEIGHT, //
+                                    image::Format::FMT_RGB888,
+                                    nullptr,
+                                    CAM_FPS,
+                                    3,
+                                    true,
+                                    true); // 实测只有单摄像头模式才能不裁切
 
-    if (!pCam.is_opened()) {
+    if (!_cam->is_opened()) {
         printf("Camera open failed!\n");
     }
 
-    pCam.exp_mode(maix::camera::AeMode::Manual);
-    pCam.exposure(200);
-    pCam.constrast(100);
-    pCam.iso(30);
+    _cam->exp_mode(maix::camera::AeMode::Manual);
+    _cam->exposure(200);
+    _cam->constrast(100);
+    _cam->iso(30);
 
-    pCam.vflip(1);
-    pCam.hmirror(1);
+    _cam->vflip(1);
+    _cam->hmirror(1);
 
     if (pCameraThread == nullptr) {
-        pCameraThread = new std::thread(&Vision::cameraThread, this, &pCam);
+        pCameraThread = new std::thread(&Vision::cameraThread, this);
         pthread_setname_np(pCameraThread->native_handle(), "cameraThread");
     }
     if (pVisionThread == nullptr) {
@@ -50,21 +50,22 @@ void Vision::visionSchedule(const VisionConfig &config)
 ╚██████╗██║  ██║██║ ╚═╝ ██║███████╗██║  ██║██║  ██║
  ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
  */
-void Vision::cameraThread(camera::Camera *pcam)
+void Vision::cameraThread()
 {
     Log::info(TAG, "camera thread start");
-    pcam->skip_frames(10);
+    this->_cam->skip_frames(10);
 
-    while (!app::need_exit()) {
+    while (Shared::threadRun) {
         try {
-            maix::image::Image *raw = pcam->read();
+            maix::image::Image *raw = this->_cam->read();
             if (!raw) {
                 maix::thread::sleep_ms(1);
                 continue;
             }
-            std::shared_ptr<image::Image> img(raw);
-            frameQueue.push(img);
+            std::shared_ptr<image::Image> img(raw->copy());
 
+            frameQueue.push(img);
+            delete raw;
             cameraFps.tick();
             maix::thread::sleep_ms(2);
 
@@ -74,7 +75,6 @@ void Vision::cameraThread(camera::Camera *pcam)
             Log::error(TAG, "cam unknown error");
         }
     }
-    delete pcam;
 }
 
 /**
@@ -87,26 +87,32 @@ void Vision::cameraThread(camera::Camera *pcam)
  */
 void Vision::visionThread()
 {
+
     maix::thread::sleep_ms(100);
 
     Log::info(TAG, "vision thread start");
     ConfigJson::print_vision(_config);
 
     while (Shared::threadRun) {
-        auto img = frameQueue.pop();
+        auto img = frameQueue.pop_non_blocking();
         if (!img) {
             maix::thread::sleep_ms(1);
             continue;
         }
-        auto new_img = std::shared_ptr<image::Image>(img->copy());
+        // auto new_img = std::shared_ptr<image::Image>(img->copy());
         try {
             maix::thread::sleep_ms(1);
-            Vision::targetDetect(new_img);
-            Vision::debugInfo(new_img);
-            recordQueue.push(new_img);
+            Vision::targetDetect(img);
+            Vision::debugInfo(img);
+
             Shared::gTargetQueue.push_latest(this->target);
+
             visonFps.tick();
             maix::thread::sleep_ms(1);
+
+            if (recordQueue.size() == 0) {
+                recordQueue.push(img);
+            }
 
         } catch (const std::exception &e) {
             Log::error(TAG, "vision exception: %s", e.what());
@@ -130,8 +136,8 @@ void Vision::recoderThread()
     maix::thread::sleep_ms(100);
     Log::info(TAG, "recoder thread start");
 
-    uint64_t last_send = 0;
 
+    uint64_t last_send = 0;
     const int TARGET_FPS = 15;
     const int FRAME_INTERVAL = 1000 / TARGET_FPS;
     /***************************************************** */
@@ -167,7 +173,7 @@ void Vision::recoderThread()
     while (Shared::threadRun) {
 
         // auto img = frameQueue.pop();
-        auto img = recordQueue.pop();
+        auto img = recordQueue.pop_non_blocking();
         if (!img) {
             maix::thread::sleep_ms(1);
             continue;
@@ -182,7 +188,8 @@ void Vision::recoderThread()
         last_send = now;
         try {
             if (_config.udp.is_enabled) {
-                std::unique_ptr<image::Image> jpeg(img->to_jpeg(80));
+                
+                std::unique_ptr<image::Image> jpeg(img->to_jpeg(50));
                 if (jpeg) {
                     int ret = sendto(sock, jpeg->data(), jpeg->data_size(), 0, (struct sockaddr *)&addr, sizeof(addr));
                     if (ret < 0)
@@ -292,7 +299,7 @@ void Vision::recoderThread_just_record_mp4(void)
                        true);
 
     while (Shared::threadRun) {
-        auto img = recordQueue.pop();
+        auto img = recordQueue.pop_non_blocking();
         if (!img)
             continue;
         skip++;
@@ -313,48 +320,54 @@ void Vision::recoderThread_just_record_mp4(void)
 
 Vision::~Vision()
 {
-    if (pVisionThread) {
-        if (pVisionThread->joinable()) {
-            pVisionThread->join();
-        }
-        delete pVisionThread;
-        pVisionThread = nullptr;
-    }
-    if (pRecoderThread) {
-        if (pRecoderThread->joinable()) {
-            pRecoderThread->join();
-        }
-        delete pRecoderThread;
-        pRecoderThread = nullptr;
-    }
-    if (pCameraThread) {
-        if (pCameraThread->joinable())
-            pCameraThread->join();
-        delete pCameraThread;
-    }
+    // if (pVisionThread) {
+    //     if (pVisionThread->joinable()) {
+    //         pVisionThread->join();
+    //     }
+    //     delete pVisionThread;
+    //     pVisionThread = nullptr;
+    // }
+    // if (pRecoderThread) {
+    //     if (pRecoderThread->joinable()) {
+    //         pRecoderThread->join();
+    //     }
+    //     delete pRecoderThread;
+    //     pRecoderThread = nullptr;
+    // }
+    // if (pCameraThread) {
+    //     if (pCameraThread->joinable())
+    //         pCameraThread->join();
+    //     delete pCameraThread;
+    // }
 }
 
 void Vision::deThread(void)
 {
-    if (pVisionThread) {
-        if (pVisionThread->joinable()) {
-            pVisionThread->join();
-        }
+
+    if (pVisionThread && pVisionThread->joinable()) {
+        pVisionThread->join();
         delete pVisionThread;
         pVisionThread = nullptr;
     }
-    if (pRecoderThread) {
-        if (pRecoderThread->joinable()) {
-            pRecoderThread->join();
-        }
+    if (pRecoderThread && pRecoderThread->joinable()) {
+        pRecoderThread->join();
+
         delete pRecoderThread;
         pRecoderThread = nullptr;
     }
-    if (pCameraThread) {
-        if (pCameraThread->joinable())
-            pCameraThread->join();
+    if (pCameraThread && pCameraThread->joinable()) {
+        pCameraThread->join();
         delete pCameraThread;
+        pCameraThread = nullptr;
     }
+    if (_cam) {
+        _cam->close();
+        delete _cam;
+        _cam = nullptr;
+        Log::warn(TAG, "cam destroy");
+    }
+    frameQueue.clear();
+    recordQueue.clear();
 
     Log::warn(TAG, "vision thread destroy");
 }

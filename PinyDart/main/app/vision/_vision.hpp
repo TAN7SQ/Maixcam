@@ -68,7 +68,7 @@ private:
     std::thread *pCameraThread = nullptr;
     std::thread *pVisionThread = nullptr;
     std::thread *pRecoderThread = nullptr;
-    void cameraThread(maix::camera::Camera *pcam);
+    void cameraThread();
     void visionThread();
     void recoderThread();
     void recoderThread_just_record_mp4(void);
@@ -86,6 +86,8 @@ private:
 
     /********************************** */
 private:
+    maix::camera::Camera *_cam;
+
     // 引导灯实际尺寸
     const float TARGET_SIZE = 5.0f; // cm
     // 摄像头内参

@@ -66,7 +66,6 @@ void Uart::run()
             parseProtocol(buf, n);
         }
     }
-    // serial->close();
 }
 
 int Uart::read(uint8_t *buf, int len)
