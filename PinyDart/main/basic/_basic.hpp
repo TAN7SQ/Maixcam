@@ -105,17 +105,25 @@ struct CamTargetData
     float yawCam = 0.0f;
     float pitchCam = 0.0f;
 };
-
+struct ControlCmd
+{
+    float yaw_rate_cmd;
+    float pitch_rate_cmd;
+    uint8_t valid;
+};
 //================================================================
 namespace Shared
 {
 extern std::atomic<bool> threadRun;
 extern SharedQueue<CamTargetData> gTargetQueue;
 extern SharedQueue<IMUAttitude> gImuAttitude;
+extern SharedQueue<ControlCmd> gControlQueue;
+
 static void reset()
 {
     gTargetQueue.clear();
     gImuAttitude.clear();
+    gControlQueue.clear();
 }
 }; // namespace Shared
 

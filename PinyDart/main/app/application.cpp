@@ -54,10 +54,14 @@ void App::appSchedule(int argc, char *argv[])
     while (!app::need_exit()) {
         maix::thread::sleep_ms(100);
     }
+
     Shared::threadRun = false;
+
     uart1.deinit();
+
     vision.deThread();
     fusion.deThread();
+
     Shared::reset();
     Log::shutdown();
 }
