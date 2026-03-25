@@ -40,6 +40,8 @@ struct ControlParms
 
     uint64_t last_time = 0;
 
+    float delay = 0.12f; // 120ms
+
     // 参数
     float Kp_angle = 3.0f;
     float Kpn = 1.5f;

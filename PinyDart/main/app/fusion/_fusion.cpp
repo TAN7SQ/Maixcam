@@ -48,23 +48,26 @@ void Fusion::fusionSchedule(const FusionConfig &config)
         pthread_setname_np(pFusionThread->native_handle(), "FusionThread");
     }
 }
-
 void Fusion::fusionThread(void)
 {
     log::info("fusion thread start");
 
-    uint64_t now;
     ControlCmd cmd;
 
     while (!app::need_exit()) {
 
         maix::thread::sleep_ms(10);
+
         if (!Shared::gTargetQueue.empty())
             camAim = Shared::gTargetQueue.pop_non_blocking();
 
-        now = maix::time::ticks_ms();
+        uint64_t now = maix::time::ticks_ms();
+
         float dt = (parms.last_time == 0) ? 0.01f : (now - parms.last_time) * 1e-3f;
+
         parms.last_time = now;
+
+        dt = std::clamp(dt, 0.005f, 0.05f);
 
         if (camAim.valid) {
 
@@ -73,22 +76,25 @@ void Fusion::fusionThread(void)
             float yaw_error = bodyT.yaw_error;
             float pitch_error = bodyT.pitch_error;
 
-            // LOS角速度
+            //  LOS角速度
             float yaw_rate = (yaw_error - parms.last_yaw_error) / dt;
             float pitch_rate = (pitch_error - parms.last_pitch_error) / dt;
-
             parms.last_yaw_error = yaw_error;
             parms.last_pitch_error = pitch_error;
+            yaw_rate = std::clamp(yaw_rate, -5.0f, 5.0f);
+            pitch_rate = std::clamp(pitch_rate, -5.0f, 5.0f);
 
             parms.yaw_rate_lpf = 0.7f * parms.yaw_rate_lpf + 0.3f * yaw_rate;
             parms.pitch_rate_lpf = 0.7f * parms.pitch_rate_lpf + 0.3f * pitch_rate;
-
             parms.yaw_rate_lpf = std::clamp(parms.yaw_rate_lpf, -parms.max_rate, parms.max_rate);
             parms.pitch_rate_lpf = std::clamp(parms.pitch_rate_lpf, -parms.max_rate, parms.max_rate);
 
-            // 混合导引
-            cmd.yaw_rate_cmd = parms.Kp_angle * yaw_error + parms.Kpn * parms.yaw_rate_lpf;
-            cmd.pitch_rate_cmd = parms.Kp_angle * pitch_error + parms.Kpn * parms.pitch_rate_lpf;
+            float yaw_error_future = yaw_error + parms.yaw_rate_lpf * parms.delay;
+            float pitch_error_future = pitch_error + parms.pitch_rate_lpf * parms.delay;
+
+            // ===== 混合导引（P + PN）=====
+            cmd.yaw_rate_cmd = parms.Kp_angle * yaw_error_future + parms.Kpn * parms.yaw_rate_lpf;
+            cmd.pitch_rate_cmd = parms.Kp_angle * pitch_error_future + parms.Kpn * parms.pitch_rate_lpf;
 
             cmd.yaw_rate_cmd = std::clamp(cmd.yaw_rate_cmd, -parms.max_rate, parms.max_rate);
             cmd.pitch_rate_cmd = std::clamp(cmd.pitch_rate_cmd, -parms.max_rate, parms.max_rate);
@@ -96,15 +102,12 @@ void Fusion::fusionThread(void)
             cmd.valid = 1;
         }
         else {
-            // 丢目标
             cmd.yaw_rate_cmd = 0;
             cmd.pitch_rate_cmd = 0;
             cmd.valid = 0;
         }
 
-        // ===== 发送 =====
         Shared::gControlQueue.push_latest(cmd);
-
         Log::info(TAG, "cmd yaw_rate:%.2f pitch_rate:%.2f", cmd.yaw_rate_cmd, cmd.pitch_rate_cmd);
     }
 
